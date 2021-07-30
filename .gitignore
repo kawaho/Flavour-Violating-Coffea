@@ -6,5 +6,7 @@
 *.json
 *.ipynb_checkpoints/
 *.tar.gz
-*coffeaenv
+*env*
+*.csv
+*.coffea
 plots.py
