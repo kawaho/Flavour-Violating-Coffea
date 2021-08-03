@@ -54,11 +54,11 @@ datadefs['EWKZ2Jets_ZToNuNu'] = 10.01
 def mclumi(sample):
   for i in datadefs:
     if i in sample:
-      return datadefs[i]
-  return -1
+      return i, datadefs[i]
+  return -1, -1
 
 if __name__ == '__main__':
-  datalumis = {'2016preVFP': 1000, '2016postVFP': 1000, '2017': 1000, '2018': 1000}
+  datalumis = {'2016preVFP': 3633, '2016postVFP': 3633, '2017': 4148 , '2018': 5983}
   year = '2017'
   if True: #for year in datalumis:
     samples_names = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'/*')
@@ -68,11 +68,14 @@ if __name__ == '__main__':
        if 'SingleMuon' in name: continue
        sample_basename = os.path.basename(name)
        sample_paths[sample_basename] = glob.glob(name+'/*/*/*/*root')
-       lumiWeight[sample_basename] = 0
+       lumiWeight[mclumi(sample_basename)[0]] = 0
        runTrees = [i+':Runs' for i in sample_paths[sample_basename]]
        for runTree in uproot.iterate(runTrees, ['genEventSumw'], num_workers=10):
-         lumiWeight[sample_basename]+=sum(runTree['genEventSumw'])*datalumis[year]/mclumi(sample_basename)
-    
+         lumiWeight[mclumi(sample_basename)[0]]+=sum(runTree['genEventSumw']) 
+   
+    for sample_basename in lumiWeight:
+      lumiWeight[mclumi(sample_basename)[0]] = mclumi(sample_basename)[1]*datalumis[year]/lumiWeight[mclumi(sample_basename)[0]]  
+
     with open('lumi_'+year+'.json', 'w') as f: 
       json.dump(lumiWeight, f, indent=4)
-
+      f.close()
