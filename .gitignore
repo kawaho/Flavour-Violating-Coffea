@@ -9,4 +9,4 @@
 *env*
 *.csv
 *.coffea
-plots.py
+*.out
