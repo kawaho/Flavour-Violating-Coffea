@@ -40,6 +40,11 @@ samples_to_run = {'make1dHist': ['GluGlu_LFV_HToEMu']}
 ## Running Processors
 See options in `run_processor.py` to specify the processor to run, the executor (parsl or local only futures_executor) to be used as well as whether or not to run it with condor. Results will be stored in `./results/{year}/*.coffea`
 
+# Format Convesions
+It is often useful to convert outputs of coffea to more familiar formats, e.g. csv or ROOT files
+1. `dict2csv.py` converts "tuple" like output to csv files
+2. `dict2ttree.py` converts "tuple" like output to TTree 
+3. `hist2TH.py` converts coffea.hist to THist (use with cvmfs independent env only) 
 
 
 
