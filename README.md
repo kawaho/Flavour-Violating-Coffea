@@ -32,13 +32,13 @@ python processors/make1dHist.py
 to generate `./processors/make1dHist_{year}.coffea`
 
 ## Sample Selections
-Modify the dictionary in `find_samples.py` to tell the processors which samples you want to run over. For example, if I want to run over `GluGlu_LFV_HToEMu` with a processor named `make1dHist`
+Modify the dictionary in `find_samples.py` to tell the processors which samples you want to run over. For example, if I want to run over `GluGlu_LFV_HToEMu` with a processor named `makeHist`
 ```python
-samples_to_run = {'make1dHist': ['GluGlu_LFV_HToEMu']}
+samples_to_run = {'makeHist': ['GluGlu_LFV_HToEMu']}
 ```
 
 ## Running Processors
-See options in `run_processor.py` to specify the processor to run, the executor (parsl or local only futures_executor) to be used as well as whether or not to run it with condor. Results will be stored in `./results/{year}/*.coffea`
+See options in `run_processor.py` to specify the processor to run, the executor (parsl or local only futures_executor) to be used as well as whether or not to run it with condor. Results will be stored in `./results/{year}/{processor name}/*.coffea`
 
 # Format Convesions
 It is often useful to convert outputs of coffea to more familiar formats, e.g. csv or ROOT files
