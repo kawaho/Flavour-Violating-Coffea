@@ -18,16 +18,19 @@ if __name__ == '__main__':
   parser.add_argument('-c', '--condor', action='store_true', help='Run on condor')
   parser.add_argument('-b', '--baseprocessor', type=str, default=None, help='processor tag')
   parser.add_argument('-y', '--year', type=str, default=None, help='analysis year')
+  parser.add_argument('-j', '--workers', type=int, default=100, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
   args = parser.parse_args()
 
-  executor = processor.futures_executor
+  executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '}
 
   if args.parsl:
     executor = processor.parsl_executor
     if args.condor:
-      htex = parsl_condor_config(workers=100)
+      htex = parsl_condor_config(workers=args.workers)
     else:
-      htex = parsl_local_config(workers=100)
+      ncpu = os.cpu_count()
+      print ("Number of cores: %i"%ncpu)
+      htex = parsl_local_config(workers=ncpu)
     # keep retrying in case the parsl fails to load
     retry_count = 0
     while True:
@@ -38,12 +41,14 @@ if __name__ == '__main__':
           retry_count += 1
           logging.warning(f'Failed to load parsl. retry {retry_count}')
           time.sleep(10)
-  
+  else:
+    executor = processor.futures_executor  
+    ncpu = os.cpu_count()
+    print ("Number of cores: %i"%ncpu)
+    executor_args['workers'] = ncpu
+
   with open(f'lumi_{args.year}.json') as f:
       lumiWeight = json.load(f)
-
-  ncpu = os.cpu_count()
-  print ("Number of cores: %i"%ncpu)
 
   samples = {}
   
@@ -51,7 +56,7 @@ if __name__ == '__main__':
     if samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
       samples[samples_shorthand] = glob.glob('/hdfs/store/user/kaho/NanoPost1/'+samples_shorthand+'*/*/*/*/*root')
 
-  if 'data' in find_samples.samples_to_run:
+  if 'data' in find_samples.samples_to_run[args.baseprocessor]:
     samples['data'] = glob.glob('/hdfs/store/user/kaho/NanoPost1/SingleMuon/*/*/*/*root')
 
   rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
@@ -63,9 +68,9 @@ if __name__ == '__main__':
       "Events",
       processor_instance,
       executor, 
-      {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '} #, "workers": os.cpu_count()}
+      executor_args      
   )
-  outputPath = f"/afs/hep.wisc.edu/home/kaho/NDHiggs/results/{args.year}/{args.baseprocessor}"
+  outputPath = f"./results/{args.year}/{args.baseprocessor}"
   Path(outputPath).mkdir(parents=True, exist_ok=True)
   save(result, f"{outputPath}/output.coffea")
 

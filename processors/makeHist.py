@@ -1,20 +1,30 @@
 from coffea import processor, hist
 from coffea.util import save
 import awkward as ak
-import numpy, json
+import numpy, json, os
 
 class MyEMuPeak(processor.ProcessorABC):
     def __init__(self, lumiWeight):
+        dataset_axis = hist.Cat("dataset", "samples")
         self._lumiWeight = lumiWeight
-        self._histo = hist.Hist(
-            "Events",
-            hist.Cat("dataset", "samples"),
-            hist.Bin("emumass", "e_mu mass", 50, 110, 160),
-        )
+        self._accumulator = processor.dict_accumulator({
+            'emumass': hist.Hist(
+                "Events",
+                dataset_axis,
+                hist.Bin("emumass", "e_mu mass", 50, 110, 160),
+            ),
+            'emumass2D': hist.Hist(
+                "Events",
+                dataset_axis,
+                hist.Bin("emumass", "e_mu mass", 50, 110, 160),
+                hist.Bin("ept", "e_pt", 40, 20, 200),
+            ),
+           
+        })
 
     @property
     def accumulator(self):
-        return self._histo
+        return self._accumulator
     
     def Vetos(self, events):
         #Choice em channel and Iso27
@@ -74,9 +84,15 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents = self.Vetos(events)
         emu = emevents.Muon[:,0] + emevents.Electron[:,0]
         weight = self.SF(emevents)
-        out.fill(
+        out['emumass'].fill(
             dataset=emevents.metadata["dataset"],
             emumass=emu.mass, 
+            weight=weight
+        )
+        out['emumass2D'].fill(
+            dataset=emevents.metadata["dataset"],
+            emumass=emu.mass, 
+            ept=emevents.Electron[:,0].pt, 
             weight=weight
         )
         return out
@@ -85,8 +101,10 @@ class MyEMuPeak(processor.ProcessorABC):
         return accumulator
 
 if __name__ == '__main__':
-  year = '2017'
-  with open('lumi_'+year+'.json') as f:
-    lumiWeight = json.load(f)
-  processor_instance = MyEMuPeak(lumiWeight)
-  save(processor_instance, f'processors/make1dHist_{year}.coffea')
+  years = ['2017']
+  for year in years:
+    with open('lumi_'+year+'.json') as f:
+      lumiWeight = json.load(f)
+    processor_instance = MyEMuPeak(lumiWeight)
+    outname = os.path.basename(__file__).replace('.py','')
+    save(processor_instance, f'processors/{outname}_{year}.coffea')

@@ -69,6 +69,7 @@ RequestCpus             = {cores_per_job}
 +RequiresCVMFS          = True
 Requirements            = TARGET.HAS_CMS_HDFS && TARGET.Arch == "X86_64"
 priority                = 10
+notification            = Complete
 '''
 
     transfer_input_files = [os.path.join(os.path.dirname(os.path.abspath(__file__)),'coffeaenv.tar.gz'), os.path.join(grid_proxy_dir, x509_proxy)]
