@@ -1,6 +1,7 @@
 *__init__*
 .__*
 results/
+conda-install.sh
 *.pyc
 *.root
 *.xml
