@@ -40,7 +40,7 @@ python find_lumis.py
 ```
 
 # Workflow
-Workflow of the package is inspired by and configuarations of parsl are modified from https://github.com/dntaylor/NanoAnalysis. All credits to Devin Taylor.
+Workflow of this repository is inspired by and configuarations of parsl are modified from https://github.com/dntaylor/NanoAnalysis. All credits to Devin Taylor.
 
 ## Coffea Processors
 Create coffea processors in the `./processors` directory. For example, do 
