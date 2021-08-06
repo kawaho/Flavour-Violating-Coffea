@@ -13,7 +13,25 @@ After setting up the first time, just do
 ```bash
 source coffeaenv/bin/activate (for cvmfs-based portable virtual env)
 ```
-to reactivate the env each time
+to reactivate the env each time. Use `deactivate` to deactivate (duhhhh!)
+
+## Setup with Conda (for python below 3.7)
+To run the plotting script, we would need matplotlib>=3.4.2 which requires python3.7 or above. Easiest way to install python>=3.7 on a shared linux machine is through conda
+```bash
+curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > conda-install.sh
+bash conda-install.sh
+```
+You might want to login again or do `source ~/.bashrc`. Then create a conda env and install coffea
+```bash
+conda create --name coffeaenv_conda python
+conda activate coffeaenv_conda
+conda install -y -c conda-forge conda-pack xrootd coffea
+```
+After setting up the first time, just do 
+```bash
+conda activate coffeaenv_conda
+```
+to reactivate the env each time. Use `conda deactivate` to deactivate (duhhhh x2!)
 
 # Lumi Weights for MC samples
 To create json files that contain the MC lumi weights, do
