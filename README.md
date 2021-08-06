@@ -64,5 +64,8 @@ It is often useful to convert outputs of coffea to more familiar formats, e.g. c
 2. `dict2ttree.py` converts "tuple" like output to TTree 
 3. `hist2TH.py` converts coffea.hist to THist (use with cvmfs independent env only) 
 
+# Experiments
+To play around and experiment, use the juypter notebooks in the notebooks directory
+
 
 
