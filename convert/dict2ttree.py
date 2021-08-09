@@ -7,7 +7,7 @@ parser.add_argument('-b', '--baseprocessor', type=str, default='makeDF', help='p
 parser.add_argument('-y', '--year', type=str, default=None, help='analysis year')
 args = parser.parse_args()
 result = load(f"results/{args.year}/{args.baseprocessor}/output.coffea")
-if isinstance(hists,tuple):
+if isinstance(result,tuple):
     result = result[0]
 var_dict = [{}, {}, {}]
 var_tree = [{}, {}, {}]

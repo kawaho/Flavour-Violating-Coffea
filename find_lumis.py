@@ -58,7 +58,7 @@ def mclumi(sample):
   return -1, -1
 
 if __name__ == '__main__':
-  datalumis = {'2016preVFP': 3633, '2016postVFP': 3633, '2017': 4148 , '2018': 5983}
+  datalumis = {'2016preVFP': 36330, '2016postVFP': 36330, '2017': 41480, '2018': 59830}
   year = '2017'
   if True: #for year in datalumis:
     samples_names = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'/*')

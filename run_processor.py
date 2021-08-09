@@ -1,11 +1,9 @@
 from coffea import processor
 from coffea.util import load, save
 from coffea.nanoevents import NanoEventsFactory, NanoAODSchema, BaseSchema
-from parsl_config import parsl_condor_config, parsl_local_config
 from pathlib import Path
-import glob, os, json, parsl, logging, argparse
+import glob, os, json, logging, argparse
 import find_samples
-
 logging.basicConfig(filename='_run_processor.log', level=logging.DEBUG, format='%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 rootLogger = logging.getLogger()
@@ -24,6 +22,8 @@ if __name__ == '__main__':
   executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '}
 
   if args.parsl:
+    from parsl_config import parsl_condor_config, parsl_local_config
+    import parsl
     executor = processor.parsl_executor
     if args.condor:
       htex = parsl_condor_config(workers=args.workers)
@@ -57,10 +57,9 @@ if __name__ == '__main__':
       samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/{samples_shorthand}*/*/*/*/*root')
 
   if 'data' in find_samples.samples_to_run[args.baseprocessor]:
-    samples['data'] = glob.glob('/hdfs/store/user/kaho/NanoPost_{args.year}/SingleMuon/*/*/*/*root')
+    samples['data'] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/SingleMuon/*/*/*/*root')
 
   rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
-
   processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 
   processor_instance = load(processorpath)
   result = processor.run_uproot_job(

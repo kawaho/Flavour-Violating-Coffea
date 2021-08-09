@@ -2,7 +2,6 @@ from coffea import processor, hist
 from coffea.util import save
 import awkward as ak
 import numpy, json, os
-
 def pZeta(leg1, leg2, MET_px, MET_py):
     leg1x = numpy.cos(leg1.phi)
     leg2x = numpy.cos(leg2.phi)
@@ -110,6 +109,38 @@ class MyDF(processor.ProcessorABC):
         trg_Match = ak.any((M_collections[:,0].delta_r(trg_collections) < 0.5),1)
 
         return emevents[trg_Match]
+
+    def Corrections(self, emevents):
+        Electron_collections = emevents.Electron[emevents.Electron.Target==1]
+        Muon_collections = emevents.Muon[emevents.Muon.Target==1]
+        MET_collections = emevents.MET
+        Jet_collections = emevents.Jet[emevents.Jet.passJet30ID==1]
+
+        #ensure Jets are pT-ordered
+        if emevents.metadata["dataset"]!='data':
+            #Jet corrections
+            Jet_collections['pt'] = Jet_collections['pt_nom']
+            Jet_collections['mass'] = Jet_collections['mass_nom']
+            #MET pT corrections
+            MET_collections['phi'] = MET_collections['T1Smear_phi'] 
+            MET_collections['pt'] = MET_collections['T1Smear_pt'] \
+                                    - ak.flatten(Muon_collections['pt']) + ak.flatten(Muon_collections['corrected_pt'])\
+                                    - ak.flatten(Electron_collections['pt']/Electron_collections['eCorr'])\
+                                    + ak.flatten(Electron_collections['pt'])
+
+            #Muon pT corrections
+            Muon_collections['pt'] = Muon_collections['corrected_pt']
+        
+        #ensure Jets are pT-ordered
+        Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
+
+        #Take the first leptons
+        Electron_collections = Electron_collections[:,0]
+        Muon_collections = Muon_collections[:,0]
+        emVar = Electron_collections + Muon_collections
+        massRange = (emVar.mass<160) & (emVar.mass>110)
+        
+        return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def SF(self, emevents):
         if emevents.metadata["dataset"]=='data': return numpy.ones(len(emevents))
@@ -133,40 +164,10 @@ class MyDF(processor.ProcessorABC):
         emevents["label"] = numpy.ones(len(emevents), dtype=bool) if 'LFV' in emevents.metadata["dataset"] else numpy.zeros(len(emevents), dtype=bool)
         
         return emevents
-    
-    def interesting(self, emevents):
+
+    def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
         #make interesting variables
         #zero/any no. of jets
-        Electron_collections = emevents.Electron[emevents.Electron.Target==1]
-        Muon_collections = emevents.Muon[emevents.Muon.Target==1]
-
-        MET_collections = emevents.MET
-        Jet_collections = emevents.Jet[emevents.Jet.passJet30ID==1]
-        L_bJet_collections = emevents.Jet[emevents.Jet.passDeepJet_L==1]
-        M_bJet_collections = emevents.Jet[emevents.Jet.passDeepJet_M==1]
-
-        #ensure Jets are pT-ordered
-        Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt_nom, axis=1, ascending=False)]
-        L_bJet_collections = L_bJet_collections[ak.argsort(L_bJet_collections.pt, axis=1, ascending=False)]
-        M_bJet_collections = M_bJet_collections[ak.argsort(M_bJet_collections.pt, axis=1, ascending=False)]
-
-        #Jet corrections
-        Jet_collections['pt'] = Jet_collections['pt_nom']
-        Jet_collections['mass'] = Jet_collections['mass_nom']
-
-        #MET pT corrections
-        MET_collections['phi'] = MET_collections['T1Smear_phi'] 
-        MET_collections['pt'] = MET_collections['T1Smear_pt'] \
-                                - ak.flatten(Muon_collections['pt']) + ak.flatten(Muon_collections['corrected_pt'])\
-                                - ak.flatten(Electron_collections['pt']/Electron_collections['eCorr'])\
-                                + ak.flatten(Electron_collections['pt'])
-
-        #Muon pT corrections
-        Muon_collections['pt'] = Muon_collections['corrected_pt']
-
-        #Take the first leptons
-        Electron_collections = Electron_collections[:,0]
-        Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
         emevents["eEta"] = Electron_collections.eta
         emevents["mEta"] = Muon_collections.eta
@@ -255,8 +256,9 @@ class MyDF(processor.ProcessorABC):
     def process(self, events):
         out = self.accumulator.identity()
         emevents = self.Vetos(events)
+        emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
+        emevents, onejets_emevents, Multijets_emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
         emevents = self.SF(emevents)
-        emevents, onejets_emevents, Multijets_emevents = self.interesting(emevents)
         for var in self.var_ :
             out[var+'_0jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 0][var].to_numpy() ) )
 
