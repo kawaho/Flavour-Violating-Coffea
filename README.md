@@ -11,7 +11,7 @@ source setup_noCVMFS.sh
 ```
 After setting up the first time, just do 
 ```bash
-source coffeaenv/bin/activate (for cvmfs-based portable virtual env)
+source activate.sh
 ```
 to reactivate the env each time. Use `deactivate` to deactivate (duhhhh!)
 
@@ -29,7 +29,7 @@ conda install -y -c conda-forge conda-pack xrootd coffea
 ```
 After setting up the first time, just do 
 ```bash
-conda activate coffeaenv_conda
+source activate.sh
 ```
 to reactivate the env each time. Use `conda deactivate` to deactivate (duhhhh x2!)
 
