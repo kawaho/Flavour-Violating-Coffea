@@ -33,6 +33,12 @@ source activate.sh
 ```
 to reactivate the env each time. Use `conda deactivate` to deactivate (duhhhh x2!)
 
+# Lumi json for datasets
+To create lumi json files for datasets (input for brilcalc: https://twiki.cern.ch/twiki/bin/view/CMS/BrilcalcQuickStart), do
+```bash
+python make_lumiMask.py
+```
+
 # Lumi Weights for MC samples
 To create json files that contain the MC lumi weights, do
 ```bash
