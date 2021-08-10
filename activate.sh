@@ -6,7 +6,6 @@ while true; do
       echo "-------------Setting up $setup virtual env-------------"
       source coffeaenv_local/bin/activate
       echo "-------------          Done            -------------"
-      voms96
       break
       ;;
     lcg)
@@ -20,7 +19,6 @@ while true; do
       echo "-------------Setting up $setup virtual env-------------"
       conda activate coffeaenv_conda
       echo "-------------          Done            -------------"
-      voms96
       break
       ;;
     *)
