@@ -8,6 +8,11 @@ class MyEMuPeak(processor.ProcessorABC):
         dataset_axis = hist.Cat("dataset", "samples")
         self._lumiWeight = lumiWeight
         self._accumulator = processor.dict_accumulator({
+            'run': hist.Hist(
+                "Events",
+                dataset_axis,
+                hist.Bin("run", "run", 11538, 294926, 306463),
+            ),
             'emMass': hist.Hist(
                 "Events",
                 dataset_axis,
@@ -74,7 +79,7 @@ class MyEMuPeak(processor.ProcessorABC):
         M_collections = emevents.Muon
 
         #Kinematics Selections
-        emevents["Electron", "Target"] = ((E_collections.pt > 24) & (abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.045) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2noIso_WP80) & (E_collections.pfRelIso03_all < 0.1))
+        emevents["Electron", "Target"] = ((E_collections.pt > 24) & (abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.045) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2noIso_WP80) & (E_collections.pfRelIso03_all < 0.1) & (E_collections.lostHits<2))
         emevents["Muon", "Target"] = ((M_collections.pt > 29) & (abs(M_collections.eta) < 2.4) & (abs(M_collections.dxy) < 0.045) & (abs(M_collections.dz) < 0.2) & (M_collections.tightId) & (M_collections.pfRelIso04_all < 0.15))
 
         E_collections = emevents.Electron[emevents.Electron.Target==1]
@@ -96,7 +101,7 @@ class MyEMuPeak(processor.ProcessorABC):
 
         trg_Match = ak.any((M_collections[:,0].delta_r(trg_collections) < 0.5),1)
 
-        return emevents[trg_Match]
+        return emevents[trg_Match & (ak.num(trg_collections) == 1)]
    
     def Corrections(self, emevents):
         Electron_collections = emevents.Electron[emevents.Electron.Target==1]
@@ -105,19 +110,27 @@ class MyEMuPeak(processor.ProcessorABC):
         Jet_collections = emevents.Jet[emevents.Jet.passJet30ID==1]
 
         #ensure Jets are pT-ordered
+        #Jet corrections
+        Jet_collections['pt'] = Jet_collections['pt_nom']
+        Jet_collections['mass'] = Jet_collections['mass_nom']
+
         if emevents.metadata["dataset"]!='data':
-            #Jet corrections
-            Jet_collections['pt'] = Jet_collections['pt_nom']
-            Jet_collections['mass'] = Jet_collections['mass_nom']
             #MET pT corrections
             MET_collections['phi'] = MET_collections['T1Smear_phi'] 
             MET_collections['pt'] = MET_collections['T1Smear_pt'] \
                                     - ak.flatten(Muon_collections['pt']) + ak.flatten(Muon_collections['corrected_pt'])\
                                     - ak.flatten(Electron_collections['pt']/Electron_collections['eCorr'])\
                                     + ak.flatten(Electron_collections['pt'])
+        else:
+            MET_collections['phi'] = MET_collections['T1_phi'] 
+            MET_collections['pt'] = MET_collections['T1_pt'] \
+                                    - ak.flatten(Muon_collections['pt']) + ak.flatten(Muon_collections['corrected_pt'])\
+                                    - ak.flatten(Electron_collections['pt']/Electron_collections['eCorr'])\
+                                    + ak.flatten(Electron_collections['pt'])
 
-            #Muon pT corrections
-            Muon_collections['pt'] = Muon_collections['corrected_pt']
+
+        #Muon pT corrections
+        Muon_collections['pt'] = Muon_collections['corrected_pt']
         
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
@@ -160,6 +173,12 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
         weight = self.SF(emevents)
         emu = Muon_collections + Electron_collections
+        if emevents.metadata["dataset"]=='data':
+          out['run'].fill(
+              dataset=emevents.metadata["dataset"],
+              run=emevents.run, 
+              weight=weight
+          )
         out['emMass'].fill(
             dataset=emevents.metadata["dataset"],
             emMass=emu.mass, 

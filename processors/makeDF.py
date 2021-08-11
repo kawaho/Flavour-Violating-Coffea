@@ -117,19 +117,27 @@ class MyDF(processor.ProcessorABC):
         Jet_collections = emevents.Jet[emevents.Jet.passJet30ID==1]
 
         #ensure Jets are pT-ordered
+        #Jet corrections
+        Jet_collections['pt'] = Jet_collections['pt_nom']
+        Jet_collections['mass'] = Jet_collections['mass_nom']
+
         if emevents.metadata["dataset"]!='data':
-            #Jet corrections
-            Jet_collections['pt'] = Jet_collections['pt_nom']
-            Jet_collections['mass'] = Jet_collections['mass_nom']
             #MET pT corrections
             MET_collections['phi'] = MET_collections['T1Smear_phi'] 
             MET_collections['pt'] = MET_collections['T1Smear_pt'] \
                                     - ak.flatten(Muon_collections['pt']) + ak.flatten(Muon_collections['corrected_pt'])\
                                     - ak.flatten(Electron_collections['pt']/Electron_collections['eCorr'])\
                                     + ak.flatten(Electron_collections['pt'])
+        else:
+            MET_collections['phi'] = MET_collections['T1_phi'] 
+            MET_collections['pt'] = MET_collections['T1_pt'] \
+                                    - ak.flatten(Muon_collections['pt']) + ak.flatten(Muon_collections['corrected_pt'])\
+                                    - ak.flatten(Electron_collections['pt']/Electron_collections['eCorr'])\
+                                    + ak.flatten(Electron_collections['pt'])
 
-            #Muon pT corrections
-            Muon_collections['pt'] = Muon_collections['corrected_pt']
+
+        #Muon pT corrections
+        Muon_collections['pt'] = Muon_collections['corrected_pt']
         
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
@@ -138,7 +146,10 @@ class MyDF(processor.ProcessorABC):
         Electron_collections = Electron_collections[:,0]
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
-        massRange = (emVar.mass<160) & (emVar.mass>110)
+        if emevents.metadata["dataset"]=='data':
+            massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
+        else:
+            massRange = (emVar.mass<160) & (emVar.mass>110)
         
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     

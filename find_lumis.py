@@ -2,9 +2,19 @@ import os, glob, json, uproot
 
 datadefs = {}
 
-datadefs['GluGlu_LFV_HToEMu'] = 48.58*0.01
+datadefs['GluGlu_LFV_HToEMu_M125'] = 48.58*0.01
 
-datadefs['VBF_LFV_HToEMu'] = 3.782*0.01
+datadefs['VBF_LFV_HToEMu_M125'] = 3.782*0.01
+
+datadefs['GluGlu_LFV_HToEMu_M120'] = 48.58*0.01
+
+datadefs['VBF_LFV_HToEMu_M120'] = 3.782*0.01
+
+datadefs['GluGlu_LFV_HToEMu_M130'] = 48.58*0.01
+
+datadefs['VBF_LFV_HToEMu_M130'] = 3.782*0.01
+
+datadefs['herwig7'] = 3.782*0.01
 
 datadefs['DYJetsToLL_M-50'] = 5398.0 #5343.0,
 

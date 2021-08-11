@@ -17,8 +17,8 @@ fout = {}
 for key, h in hists.items():
     if not isinstance(h, hist.Hist): continue
     for dataset in h.identifiers('dataset'):
-        fout[dataset] = uproot3.recreate(f'results/{args.year}/{args.baseprocessor}/{dataset}.root')
-    break
+        if not dataset in fout:
+           fout[dataset] = uproot3.recreate(f'results/{args.year}/{args.baseprocessor}/{dataset}.root')
 
 for key, h in hists.items():
     if not isinstance(h, hist.Hist): continue
