@@ -2,63 +2,56 @@ import os, glob, json, uproot
 
 datadefs = {}
 
-datadefs['GluGlu_LFV_HToEMu_M125'] = 48.58*0.01
+#https://twiki.cern.ch/twiki/bin/view/LHCPhysics/CERNYellowReportPageAt13TeV
+#m_{H} = 125.09GeV
+datadefs['GluGlu_LFV_HToEMu_M125'] = 48.52*0.01
+datadefs['VBF_LFV_HToEMu_M125'] = 3.779*0.01
+datadefs['GluGlu_LFV_HToEMu_M120'] = datadefs['GluGlu_LFV_HToEMu_M125']
+datadefs['GluGlu_LFV_HToEMu_M130'] = datadefs['GluGlu_LFV_HToEMu_M125']
+datadefs['VBF_LFV_HToEMu_M120'] = datadefs['VBF_LFV_HToEMu_M125']
+datadefs['VBF_LFV_HToEMu_M130'] = datadefs['VBF_LFV_HToEMu_M125']
+datadefs['herwig7'] = datadefs['VBF_LFV_HToEMu_M125']
 
-datadefs['VBF_LFV_HToEMu_M125'] = 3.782*0.01
+#https://twiki.cern.ch/twiki/bin/viewauth/CMS/StandardModelCrossSectionsat13TeV
+#>50 6077.22 +-1.49 (integration) +- 14.78 (pdf) +- 2% (scale) 
+datadefs['DYJetsToLL_M-50'] = 6404.0, #+-27.69 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2
+datadefs['DYJetsToLL_0J'] = 5129.0 #+-8.715 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 
+datadefs['DYJetsToLL_1J'] = 951.5 #+-6.067 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1
+datadefs['DYJetsToLL_2J'] = 361.4 #+-3.704 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 
 
-datadefs['GluGlu_LFV_HToEMu_M120'] = 48.58*0.01
+#lfv NNLO
+datadefs['DYJetsToLL_M-10to50'] = 18610.0 #15890.0+-24.94 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
 
-datadefs['VBF_LFV_HToEMu_M120'] = 3.782*0.01
+#61526.7 NNLO Htt
+#https://twiki.cern.ch/twiki/bin/viewauth/CMS/HowToGenXSecAnalyzer#Running_the_GenXSecAnalyzer_on_a
+datadefs['WJetsToLNu_TuneCP5'] = 53870.0 #TODO GenXSecAnalyzer
+datadefs['WJetsToLNu_0J'] = 53330.0 #+-90.89 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 NLO
+datadefs['WJetsToLNu_1J'] = 8875.0 #+-55.31 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
+datadefs['WJetsToLNu_2J'] = 3338.0 #+-34.64 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
 
-datadefs['GluGlu_LFV_HToEMu_M130'] = 48.58*0.01
+datadefs['WGToLNuG_TuneCP5'] = 412.7 #+-1.027 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
 
-datadefs['VBF_LFV_HToEMu_M130'] = 3.782*0.01
+#https://twiki.cern.ch/twiki/bin/viewauth/CMS/StandardModelCrossSectionsat13TeV
+datadefs['WW_TuneCP5'] = 118.7 #+2.5%-2.2% NNLO
 
-datadefs['herwig7'] = 3.782*0.01
+#lfv NNLO
+datadefs['ZZ_TuneCP5'] = 16.91 #12.17+-0.01966 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2
+datadefs['WZ_TuneCP5'] = 51.11 #27.59+-0.03993 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2
 
-datadefs['DYJetsToLL_M-50'] = 5398.0 #5343.0,
+#XSDB
+datadefs['TTTo2L2Nu'] = 88.29 #+4.8%-6.1% NNLO
+datadefs['TTToSemiLeptonic'] = 365.34 #+4.8%-6.1% NNLO
+datadefs['TTToHadronic'] = 377.96 #+4.8%-6.1% NNLO
 
-datadefs['DYJetsToLL_M-10to50'] = 15890.0 #18610.0,
+#https://twiki.cern.ch/twiki/bin/view/LHCPhysics/SingleTopRefXsec
+datadefs['ST_tW_antitop_5f_inclusiveDecays'] = 35.85 #71.7/2 Scale: +1.80-1.80 PDF: +3.40-3.40 NLO
+datadefs['ST_tW_top_5f_inclusiveDecays'] = 35.85 #see above 
+datadefs['ST_t-channel_antitop_5f_InclusiveDecays'] = 80.95 #+4.06-3.61 NLO
+datadefs['ST_t-channel_top_5f_InclusiveDecays'] = 136.02 #+5.40-4.57 NLO
 
-datadefs['DYJetsToLL_0J'] = 928.3 #877.8,
+datadefs['EWKZ2Jets_ZToLL'] = 6.215 #+-0.004456 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
 
-datadefs['DYJetsToLL_1J'] = 292.4 #325.7, #Not on XSDB304.4,
-
-datadefs['DYJetsToLL_2J'] = 86.53 #111.5,
-
-datadefs['WJetsToLNu_TuneCP5'] = 53870.0 #52940.0,
-
-datadefs['"WJetsToLNu_0J'] = 8927.0 #8104.0,
-
-datadefs['WJetsToLNu_1J'] = 2809.0 #2793.0,
-
-datadefs['WJetsToLNu_2J'] = 826.3 #992.5,
-
-datadefs['WGToLNuG_TuneCP5'] = 464.4
-
-datadefs['ZZ_TuneCP5'] = 12.17 #12.14,
-
-datadefs['WZ_TuneCP5'] = 27.59 #27.57,
-
-datadefs['WW_TuneCP5'] = 75.95 #75.88,
-
-datadefs['TTTo2L2Nu'] = 88.29
-
-datadefs['TTToSemiLeptonic'] = 365.34
-
-datadefs['TTToHadronic'] = 377.96
-
-datadefs['ST_tW_antitop_5f_inclusiveDecays'] = 35.85
-
-datadefs['ST_tW_top_5f_inclusiveDecays'] = 35.85
-
-datadefs['ST_t-channel_antitop_4f_inclusiveDecays'] = 80.95
-
-datadefs['ST_t-channel_top_4f_inclusiveDecays'] = 136.02
-
-datadefs['EWKZ2Jets_ZToLL'] = 3.987
-
-datadefs['EWKZ2Jets_ZToNuNu'] = 10.01
+datadefs['EWKZ2Jets_ZToNuNu'] = 10.66 #+-2.969e-03 GenXSecAnalyzer
 
 def mclumi(sample):
   for i in datadefs:
