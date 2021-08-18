@@ -8,11 +8,11 @@ class MyEMuPeak(processor.ProcessorABC):
         dataset_axis = hist.Cat("dataset", "samples")
         self._lumiWeight = lumiWeight
         self._accumulator = processor.dict_accumulator({
-            'run': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("run", "run", 11538, 294926, 306463),
-            ),
+           # 'run': hist.Hist(
+           #     "Events",
+           #     dataset_axis,
+           #     hist.Bin("run", "run", 11538, 294926, 306463),
+           # ),
             'emMass': hist.Hist(
                 "Events",
                 dataset_axis,
@@ -109,29 +109,28 @@ class MyEMuPeak(processor.ProcessorABC):
         MET_collections = emevents.MET
         Jet_collections = emevents.Jet[emevents.Jet.passJet30ID==1]
 
-        #ensure Jets are pT-ordered
         #Jet corrections
         Jet_collections['pt'] = Jet_collections['pt_nom']
         Jet_collections['mass'] = Jet_collections['mass_nom']
 
+        #MET corrections
         if emevents.metadata["dataset"]!='data':
-            #MET pT corrections
             MET_collections['phi'] = MET_collections['T1Smear_phi'] 
-            MET_collections['pt'] = MET_collections['T1Smear_pt'] \
-                                    - ak.flatten(Muon_collections['pt']) + ak.flatten(Muon_collections['corrected_pt'])\
-                                    - ak.flatten(Electron_collections['pt']/Electron_collections['eCorr'])\
-                                    + ak.flatten(Electron_collections['pt'])
+            MET_collections['pt'] = MET_collections['T1Smear_pt'] 
         else:
             MET_collections['phi'] = MET_collections['T1_phi'] 
-            MET_collections['pt'] = MET_collections['T1_pt'] \
-                                    - ak.flatten(Muon_collections['pt']) + ak.flatten(Muon_collections['corrected_pt'])\
-                                    - ak.flatten(Electron_collections['pt']/Electron_collections['eCorr'])\
-                                    + ak.flatten(Electron_collections['pt'])
+            MET_collections['pt'] = MET_collections['T1_pt'] 
 
-
-        #Muon pT corrections
-        Muon_collections['pt'] = Muon_collections['corrected_pt']
+        #MET corrections Electron
+        Electron_collections_tmp = Electron_collections
+        Electron_collections_tmp['pt'] = Electron_collections_tmp['pt']/Electron_collections_tmp['eCorr']
+        MET_collections = MET_collections+Electron_collections_tmp[:,0]-Electron_collections[:,0]
         
+        #Muon pT corrections
+        MET_collections = MET_collections+Muon_collections[:,0]
+        Muon_collections['pt'] = Muon_collections['corrected_pt']
+        MET_collections = MET_collections-Muon_collections[:,0]
+
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
 
@@ -139,11 +138,13 @@ class MyEMuPeak(processor.ProcessorABC):
         Electron_collections = Electron_collections[:,0]
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
-        if emevents.metadata["dataset"]=='data':
+
+        if 'LFV' in emevents.metadata["dataset"]:
+            massRange = (emVar.mass<160) & (emVar.mass>110)
+        elif emevents.metadata["dataset"] == 'data':
             massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         else:
-            massRange = (emVar.mass<160) & (emVar.mass>110)
-        
+            massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
  
     def SF(self, emevents):
@@ -170,66 +171,69 @@ class MyEMuPeak(processor.ProcessorABC):
     def process(self, events):
         out = self.accumulator.identity()
         emevents = self.Vetos(events)
-        emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
-        weight = self.SF(emevents)
-        emu = Muon_collections + Electron_collections
-        if emevents.metadata["dataset"]=='data':
-          out['run'].fill(
+        if len(emevents)>0:
+          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
+          weight = self.SF(emevents)
+          emu = Muon_collections + Electron_collections
+          #if emevents.metadata["dataset"]=='data':
+          #  out['run'].fill(
+          #      dataset=emevents.metadata["dataset"],
+          #      run=emevents.run, 
+          #      weight=weight
+          #  )
+          out['emMass'].fill(
               dataset=emevents.metadata["dataset"],
-              run=emevents.run, 
+              emMass=emu.mass, 
               weight=weight
           )
-        out['emMass'].fill(
-            dataset=emevents.metadata["dataset"],
-            emMass=emu.mass, 
-            weight=weight
-        )
-        out['ePt'].fill(
-            dataset=emevents.metadata["dataset"],
-            ePt=Electron_collections.pt, 
-            weight=weight
-        )
-        out['mPt'].fill(
-            dataset=emevents.metadata["dataset"],
-            mPt=Muon_collections.pt, 
-            weight=weight
-        )
-        out['eEta'].fill(
-            dataset=emevents.metadata["dataset"],
-            eEta=Electron_collections.eta, 
-            weight=weight
-        )
-        out['mEta'].fill(
-            dataset=emevents.metadata["dataset"],
-            mEta=Muon_collections.eta, 
-            weight=weight
-        )
-        out['j1Pt'].fill(
-            dataset=emevents.metadata["dataset"],
-            j1Pt=Jet_collections[emevents.nJet30 >= 1][:,0].pt, 
-            weight=weight[emevents.nJet30 >= 1]
-        )
-        out['j2Pt'].fill(
-            dataset=emevents.metadata["dataset"],
-            j2Pt=Jet_collections[emevents.nJet30 >= 2][:,1].pt, 
-            weight=weight[emevents.nJet30 >= 2]
-        )
-        out['j1Eta'].fill(
-            dataset=emevents.metadata["dataset"],
-            j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
-            weight=weight[emevents.nJet30 >= 1]
-        )
-        out['j2Eta'].fill(
-            dataset=emevents.metadata["dataset"],
-            j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
-            weight=weight[emevents.nJet30 >= 2]
-        )
-        #out['emumass2D'].fill(
-        #    dataset=emevents.metadata["dataset"],
-        #    emumass=emu.mass, 
-        #    ept=Electron_collections.pt, 
-        #    weight=weight
-        #)
+          out['ePt'].fill(
+              dataset=emevents.metadata["dataset"],
+              ePt=Electron_collections.pt, 
+              weight=weight
+          )
+          out['mPt'].fill(
+              dataset=emevents.metadata["dataset"],
+              mPt=Muon_collections.pt, 
+              weight=weight
+          )
+          out['eEta'].fill(
+              dataset=emevents.metadata["dataset"],
+              eEta=Electron_collections.eta, 
+              weight=weight
+          )
+          out['mEta'].fill(
+              dataset=emevents.metadata["dataset"],
+              mEta=Muon_collections.eta, 
+              weight=weight
+          )
+          out['j1Pt'].fill(
+              dataset=emevents.metadata["dataset"],
+              j1Pt=Jet_collections[emevents.nJet30 >= 1][:,0].pt, 
+              weight=weight[emevents.nJet30 >= 1]
+          )
+          out['j2Pt'].fill(
+              dataset=emevents.metadata["dataset"],
+              j2Pt=Jet_collections[emevents.nJet30 >= 2][:,1].pt, 
+              weight=weight[emevents.nJet30 >= 2]
+          )
+          out['j1Eta'].fill(
+              dataset=emevents.metadata["dataset"],
+              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
+              weight=weight[emevents.nJet30 >= 1]
+          )
+          out['j2Eta'].fill(
+              dataset=emevents.metadata["dataset"],
+              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
+              weight=weight[emevents.nJet30 >= 2]
+          )
+          #out['emumass2D'].fill(
+          #    dataset=emevents.metadata["dataset"],
+          #    emumass=emu.mass, 
+          #    ept=Electron_collections.pt, 
+          #    weight=weight
+          #)
+        else:
+          print("No Events found in "+emevents.metadata["dataset"]) 
         return out
 
     def postprocess(self, accumulator):

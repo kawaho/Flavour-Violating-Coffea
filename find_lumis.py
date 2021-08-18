@@ -1,5 +1,9 @@
 import os, glob, json, uproot
 
+DYNNLO = 6077.22/6404.0
+WNNLO = 61526.7/53870.0
+dyLumi, wLumi = 1, 1
+
 datadefs = {}
 
 #https://twiki.cern.ch/twiki/bin/view/LHCPhysics/CERNYellowReportPageAt13TeV
@@ -12,9 +16,19 @@ datadefs['VBF_LFV_HToEMu_M120'] = datadefs['VBF_LFV_HToEMu_M125']
 datadefs['VBF_LFV_HToEMu_M130'] = datadefs['VBF_LFV_HToEMu_M125']
 datadefs['herwig7'] = datadefs['VBF_LFV_HToEMu_M125']
 
+datadefs['GluGluHToTauTau'] = 48.52*6.256e-02
+datadefs['VBFHToTauTau'] = 3.779*6.256e-02
+datadefs['WminusHToTauTau'] = 5.313e-01*6.256e-02
+datadefs['WplusHToTauTau'] = 8.380e-01*6.256e-02
+
+datadefs['GluGluHToWWTo2L2Nu'] = 48.52*2.152e-01*0.1086**2
+datadefs['VBFHToWWTo2L2Nu'] = 3.779*2.152e-01*0.1086**2
+
+datadefs['ZHToTauTau'] = 8.824e-01*6.256e-02
+
 #https://twiki.cern.ch/twiki/bin/viewauth/CMS/StandardModelCrossSectionsat13TeV
 #>50 6077.22 +-1.49 (integration) +- 14.78 (pdf) +- 2% (scale) 
-datadefs['DYJetsToLL_M-50'] = 6404.0, #+-27.69 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2
+datadefs['DYJetsToLL_M-50'] = 6404.0 #+-27.69 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2
 datadefs['DYJetsToLL_0J'] = 5129.0 #+-8.715 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 
 datadefs['DYJetsToLL_1J'] = 951.5 #+-6.067 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1
 datadefs['DYJetsToLL_2J'] = 361.4 #+-3.704 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 
@@ -53,6 +67,10 @@ datadefs['EWKZ2Jets_ZToLL'] = 6.215 #+-0.004456 RunIISummer20UL16MiniAOD-106X_mc
 
 datadefs['EWKZ2Jets_ZToNuNu'] = 10.66 #+-2.969e-03 GenXSecAnalyzer
 
+datadefs['EWKWMinus2Jets'] = 32.05 #+-0.02492 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
+datadefs['EWKWPlus2Jets'] = 39.05 #+-0.0291 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
+
+
 def mclumi(sample):
   for i in datadefs:
     if i in sample:
@@ -74,9 +92,27 @@ if __name__ == '__main__':
        runTrees = [i+':Runs' for i in sample_paths[sample_basename]]
        for runTree in uproot.iterate(runTrees, ['genEventSumw'], num_workers=10):
          lumiWeight[mclumi(sample_basename)[0]]+=sum(runTree['genEventSumw']) 
-   
+  
     for sample_basename in lumiWeight:
-      lumiWeight[mclumi(sample_basename)[0]] = mclumi(sample_basename)[1]*datalumis[year]/lumiWeight[mclumi(sample_basename)[0]]  
+      if ('DY' in sample_basename and not '10to50' in sample_basename) or ('WJ' in sample_basename): 
+        lumiWeight[sample_basename] = lumiWeight[sample_basename]/(mclumi(sample_basename)[1])
+        if sample_basename=="DYJetsToLL_M-50":
+          dyLumi = lumiWeight[sample_basename]
+        if sample_basename=="WJetsToLNu_TuneCP5":
+          wLumi = lumiWeight[sample_basename]
+
+      else:
+        lumiWeight[sample_basename] = mclumi(sample_basename)[1]*datalumis[year]/lumiWeight[sample_basename]  
+
+    for sample_basename in lumiWeight:
+      if "DYJetsToLL_M-50" in sample_basename:
+        lumiWeight[sample_basename] = DYNNLO*datalumis[year]/dyLumi
+      elif "DY" in sample_basename and not "M-10to50" in sample_basename:
+        lumiWeight[sample_basename] = DYNNLO*datalumis[year]/(lumiWeight[sample_basename]+dyLumi)
+      elif "WJetsToLNu_TuneCP5" in sample_basename: 
+        lumiWeight[sample_basename] = WNNLO*datalumis[year]/wLumi
+      elif "WJ" in sample_basename:
+        lumiWeight[sample_basename] = WNNLO*datalumis[year]/(lumiWeight[sample_basename]+wLumi) 
 
     with open('lumi_'+year+'.json', 'w') as f: 
       json.dump(lumiWeight, f, indent=4)

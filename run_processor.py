@@ -4,10 +4,15 @@ from coffea.nanoevents import NanoEventsFactory, NanoAODSchema, BaseSchema
 from pathlib import Path
 import glob, os, json, logging, argparse
 import find_samples
+
+import uproot
+uproot.open.defaults["xrootd_handler"] = uproot.source.xrootd.MultithreadedXRootDSource
+
 logging.basicConfig(filename='_run_processor.log', level=logging.DEBUG, format='%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 rootLogger = logging.getLogger()
 logging.captureWarnings(True)
+
 
 if __name__ == '__main__':
 
@@ -19,7 +24,7 @@ if __name__ == '__main__':
   parser.add_argument('-j', '--workers', type=int, default=100, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
   args = parser.parse_args()
 
-  executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '}
+  executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '}#, 'config': htex}
 
   if args.parsl:
     from parsl_config import parsl_condor_config, parsl_local_config
@@ -51,7 +56,7 @@ if __name__ == '__main__':
       lumiWeight = json.load(f)
 
   samples = {}
-  
+
   for samples_shorthand in lumiWeight:
     if samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
       samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/{samples_shorthand}*/*/*/*/*root')
@@ -59,15 +64,23 @@ if __name__ == '__main__':
   if 'data' in find_samples.samples_to_run[args.baseprocessor]:
     samples['data'] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/SingleMuon/*/*/*/*root')
 
+  if args.parsl:
+    for samples_shorthand in samples: 
+      samples[samples_shorthand] = [i.replace('/hdfs','root://cmsxrootd.hep.wisc.edu/') for i in samples[samples_shorthand]]
   rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
   processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 
   processor_instance = load(processorpath)
+#  pre_executor = processor.futures_executor #parsl_executor#(config=parsl_local_config(os.cpu_count()))
+#  pre_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Preprocessing {args.baseprocessor} {args.year} ', 'workers': os.cpu_count()} #'config': parsl_local_config(10)}#, 'workers': os.cpu_count()}
   result = processor.run_uproot_job(
       samples,
       "Events",
       processor_instance,
       executor, 
-      executor_args      
+      executor_args,
+      chunksize=200000  
+      #pre_executor,
+      #pre_args
   )
   outputPath = f"./results/{args.year}/{args.baseprocessor}"
   Path(outputPath).mkdir(parents=True, exist_ok=True)
