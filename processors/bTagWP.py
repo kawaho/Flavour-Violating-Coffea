@@ -8,63 +8,26 @@ class MyEMuPeak(processor.ProcessorABC):
         dataset_axis = hist.Cat("dataset", "samples")
         self._lumiWeight = lumiWeight
         self._accumulator = processor.dict_accumulator({
-           # 'run': hist.Hist(
-           #     "Events",
-           #     dataset_axis,
-           #     hist.Bin("run", "run", 11538, 294926, 306463),
-           # ),
-            'emMass': hist.Hist(
+            'emMass_deepjet_L': hist.Hist(
                 "Events",
                 dataset_axis,
-                hist.Bin("emMass", "emMass", 50, 110, 160),
+                hist.Bin("emMass_deepjet_L", r"$m_{e\mu}$ [GeV]", 50, 110, 160),
             ),
-            'ePt': hist.Hist(
+            'emMass_deepjet_M': hist.Hist(
                 "Events",
                 dataset_axis,
-                hist.Bin("ePt", "ePt", 40, 24, 200),
-            ),
-            'mPt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("mPt", "mPt", 40, 29, 200),
-            ),
-            'eEta': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("eEta", "eEta", 50, -2.5, 2.5),
-            ),
-            'mEta': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("mEta", "mEta", 50, -2.4, 2.4),
-            ),
-            'j1Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j1Pt", "j1Pt", 40, 30, 500),
-            ),
-            'j2Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j2Pt", "j2Pt", 40, 30, 200),
-            ),
-            'j1Eta': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j1Eta", "j1Eta", 50, -5, 5),
-            ),
-            'j2Eta': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j2Eta", "j2Eta", 50, -5, 5),
-            ),
-        #    'emumass2D': hist.Hist(
-        #        "Events",
-        #        dataset_axis,
-        #        hist.Bin("emumass", "e_mu mass", 50, 110, 160),
-        #        hist.Bin("ept", "e_pt", 40, 20, 200),
-        #    ),
-           
+                hist.Bin("emMass_deepjet_M", r"$m_{e\mu}$ [GeV]", 50, 110, 160),
+            )
+#            'emMass_deepcsv_L': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("emMass_deepcsv_L", r"$m_{e\mu}$ [GeV]", 50, 110, 160),
+#            ),
+#            'emMass_deepcsv_M': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("emMass_deepcsv_M", r"$m_{e\mu}$ [GeV]", 50, 110, 160),
+#            )
         })
 
     @property
@@ -141,18 +104,20 @@ class MyEMuPeak(processor.ProcessorABC):
         emVar = Electron_collections + Muon_collections
 
         if 'LFV' in emevents.metadata["dataset"]:
-            massRange = (emVar.mass<160) & (emVar.mass>110)
+            massRange = (emVar.mass<135) & (emVar.mass>115)
         elif emevents.metadata["dataset"] == 'data':
             massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         else:
-            massRange = (emVar.mass<160) & (emVar.mass>110) #((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
+            massRange = (emVar.mass<135) & (emVar.mass>115) #((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
  
     def SF(self, emevents):
-        if emevents.metadata["dataset"]=='data': return numpy.ones(len(emevents))
+        if emevents.metadata["dataset"]=='data': return ak.sum(emevents.Jet.passDeepJet_L,1)==0, ak.sum(emevents.Jet.passDeepJet_M,1)==0#, ak.sum(emevents.Jet.passDeepCSV_L,1)==0, ak.sum(emevents.Jet.passDeepCSV_M,1)==0
         #Get bTag SF
-        bTagSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
-        bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
+        bTagJetSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
+        bTagJetSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
+#        bTagCSVSF_L = ak.prod(1-emevents.Jet.btagSF_deepcsv_L*emevents.Jet.passDeepCSV_L, axis=1)
+#        bTagCSVSF_M = ak.prod(1-emevents.Jet.btagSF_deepcsv_M*emevents.Jet.passDeepCSV_M, axis=1)
 
         #PU/PF/Gen Weights
         SF = emevents.puWeight*emevents.PrefireWeight*emevents.genWeight
@@ -164,9 +129,9 @@ class MyEMuPeak(processor.ProcessorABC):
         SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF
 
         #Electron SF
-        SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF
+        SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF*self._lumiWeight[emevents.metadata["dataset"]]
         
-        return SF*self._lumiWeight[emevents.metadata["dataset"]]
+        return SF*bTagJetSF_L, SF*bTagJetSF_M#, SF*bTagCSVSF_L, SF*bTagCSVSF_M
         
     # we will receive a NanoEvents instead of a coffea DataFrame
     def process(self, events):
@@ -174,65 +139,29 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents = self.Vetos(events)
         if len(emevents)>0:
           emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
-          weight = self.SF(emevents)
+          weight_deepjet_L, weight_deepjet_M = self.SF(emevents)
+          #weight_deepjet_L, weight_deepjet_M, weight_deepcsv_L, weight_deepcsv_M = self.SF(emevents)
           emu = Muon_collections + Electron_collections
-          #if emevents.metadata["dataset"]=='data':
-          #  out['run'].fill(
-          #      dataset=emevents.metadata["dataset"],
-          #      run=emevents.run, 
-          #      weight=weight
-          #  )
-          out['emMass'].fill(
+          out['emMass_deepjet_L'].fill(
               dataset=emevents.metadata["dataset"],
-              emMass=emu.mass, 
-              weight=weight
+              emMass_deepjet_L=emu.mass, 
+              weight=weight_deepjet_L
           )
-          out['ePt'].fill(
+          out['emMass_deepjet_M'].fill(
               dataset=emevents.metadata["dataset"],
-              ePt=Electron_collections.pt, 
-              weight=weight
+              emMass_deepjet_M=emu.mass, 
+              weight=weight_deepjet_M
           )
-          out['mPt'].fill(
-              dataset=emevents.metadata["dataset"],
-              mPt=Muon_collections.pt, 
-              weight=weight
-          )
-          out['eEta'].fill(
-              dataset=emevents.metadata["dataset"],
-              eEta=Electron_collections.eta, 
-              weight=weight
-          )
-          out['mEta'].fill(
-              dataset=emevents.metadata["dataset"],
-              mEta=Muon_collections.eta, 
-              weight=weight
-          )
-          out['j1Pt'].fill(
-              dataset=emevents.metadata["dataset"],
-              j1Pt=Jet_collections[emevents.nJet30 >= 1][:,0].pt, 
-              weight=weight[emevents.nJet30 >= 1]
-          )
-          out['j2Pt'].fill(
-              dataset=emevents.metadata["dataset"],
-              j2Pt=Jet_collections[emevents.nJet30 >= 2][:,1].pt, 
-              weight=weight[emevents.nJet30 >= 2]
-          )
-          out['j1Eta'].fill(
-              dataset=emevents.metadata["dataset"],
-              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
-              weight=weight[emevents.nJet30 >= 1]
-          )
-          out['j2Eta'].fill(
-              dataset=emevents.metadata["dataset"],
-              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
-              weight=weight[emevents.nJet30 >= 2]
-          )
-          #out['emumass2D'].fill(
-          #    dataset=emevents.metadata["dataset"],
-          #    emumass=emu.mass, 
-          #    ept=Electron_collections.pt, 
-          #    weight=weight
-          #)
+#          out['emMass_deepcsv_L'].fill(
+#              dataset=emevents.metadata["dataset"],
+#              emMass_deepcsv_L=emu.mass, 
+#              weight=weight_deepcsv_L
+#          )
+#          out['emMass_deepcsv_M'].fill(
+#              dataset=emevents.metadata["dataset"],
+#              emMass_deepcsv_M=emu.mass, 
+#              weight=weight_deepcsv_M
+#          )
         else:
           print("No Events found in "+emevents.metadata["dataset"]) 
         return out
