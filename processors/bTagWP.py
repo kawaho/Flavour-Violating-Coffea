@@ -11,12 +11,12 @@ class MyEMuPeak(processor.ProcessorABC):
             'emMass_deepjet_L': hist.Hist(
                 "Events",
                 dataset_axis,
-                hist.Bin("emMass_deepjet_L", r"$m_{e\mu}$ [GeV]", 50, 110, 160),
+                hist.Bin("emMass_deepjet_L", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
             ),
             'emMass_deepjet_M': hist.Hist(
                 "Events",
                 dataset_axis,
-                hist.Bin("emMass_deepjet_M", r"$m_{e\mu}$ [GeV]", 50, 110, 160),
+                hist.Bin("emMass_deepjet_M", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
             )
 #            'emMass_deepcsv_L': hist.Hist(
 #                "Events",
@@ -69,34 +69,9 @@ class MyEMuPeak(processor.ProcessorABC):
     def Corrections(self, emevents):
         Electron_collections = emevents.Electron[emevents.Electron.Target==1]
         Muon_collections = emevents.Muon[emevents.Muon.Target==1]
-        MET_collections = emevents.MET
-        Jet_collections = emevents.Jet[emevents.Jet.passJet30ID==1]
 
-        #Jet corrections
-        Jet_collections['pt'] = Jet_collections['pt_nom']
-        Jet_collections['mass'] = Jet_collections['mass_nom']
-
-        #MET corrections
-        if emevents.metadata["dataset"]!='data':
-            MET_collections['phi'] = MET_collections['T1Smear_phi'] 
-            MET_collections['pt'] = MET_collections['T1Smear_pt'] 
-        else:
-            MET_collections['phi'] = MET_collections['T1_phi'] 
-            MET_collections['pt'] = MET_collections['T1_pt'] 
-
-        #MET corrections Electron
-        Electron_collections['pt'] = Electron_collections['pt']/Electron_collections['eCorr']
-        MET_collections = MET_collections+Electron_collections[:,0]
-        Electron_collections['pt'] = Electron_collections['pt']*Electron_collections['eCorr']
-        MET_collections = MET_collections-Electron_collections[:,0]
-        
         #Muon pT corrections
-        MET_collections = MET_collections+Muon_collections[:,0]
         Muon_collections['pt'] = Muon_collections['corrected_pt']
-        MET_collections = MET_collections-Muon_collections[:,0]
-
-        #ensure Jets are pT-ordered
-        Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
 
         #Take the first leptons
         Electron_collections = Electron_collections[:,0]
@@ -109,7 +84,7 @@ class MyEMuPeak(processor.ProcessorABC):
             massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         else:
             massRange = (emVar.mass<135) & (emVar.mass>115) #((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
-        return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
+        return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange]	
  
     def SF(self, emevents):
         if emevents.metadata["dataset"]=='data': return ak.sum(emevents.Jet.passDeepJet_L,1)==0, ak.sum(emevents.Jet.passDeepJet_M,1)==0#, ak.sum(emevents.Jet.passDeepCSV_L,1)==0, ak.sum(emevents.Jet.passDeepCSV_M,1)==0
@@ -138,7 +113,7 @@ class MyEMuPeak(processor.ProcessorABC):
         out = self.accumulator.identity()
         emevents = self.Vetos(events)
         if len(emevents)>0:
-          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
+          emevents, Electron_collections, Muon_collections = self.Corrections(emevents)
           weight_deepjet_L, weight_deepjet_M = self.SF(emevents)
           #weight_deepjet_L, weight_deepjet_M, weight_deepcsv_L, weight_deepcsv_M = self.SF(emevents)
           emu = Muon_collections + Electron_collections

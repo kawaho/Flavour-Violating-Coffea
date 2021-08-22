@@ -1,9 +1,5 @@
 import os, glob, json, uproot
 
-DYNNLO = 6077.22/6404.0
-WNNLO = 61526.7/53870.0
-dyLumi, wLumi = 1, 1
-
 datadefs = {}
 
 #https://twiki.cern.ch/twiki/bin/view/LHCPhysics/CERNYellowReportPageAt13TeV
@@ -69,6 +65,10 @@ datadefs['EWKZ2Jets_ZToNuNu'] = 10.66 #+-2.969e-03 GenXSecAnalyzer
 
 datadefs['EWKWMinus2Jets'] = 32.05 #+-0.02492 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
 datadefs['EWKWPlus2Jets'] = 39.05 #+-0.0291 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
+
+DYNNLO = 6077.22/datadefs['DYJetsToLL_M-50']
+WNNLO = 61526.7/datadefs['WJetsToLNu_TuneCP5']
+dyLumi, wLumi = 1, 1
 
 
 def mclumi(sample):
