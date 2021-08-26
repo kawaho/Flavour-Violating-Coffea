@@ -20,12 +20,9 @@ if __name__ == '__main__':
   parser.add_argument('-p', '--parsl', action='store_true', help='Use parsl to distribute')
   parser.add_argument('-c', '--condor', action='store_true', help='Run on condor')
   parser.add_argument('-b', '--baseprocessor', type=str, default=None, help='processor tag')
-  parser.add_argument('-s', '--subfix', type=str, default=None, help='output tag')
   parser.add_argument('-y', '--year', type=str, default=None, help='analysis year')
-  parser.add_argument('-j', '--workers', type=int, default=200, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
+  parser.add_argument('-j', '--workers', type=int, default=100, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
   args = parser.parse_args()
-
-  executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '}#, 'config': htex}
 
   if args.parsl:
     from parsl_config import parsl_condor_config, parsl_local_config
@@ -56,24 +53,28 @@ if __name__ == '__main__':
   with open(f'lumi_{args.year}.json') as f:
       lumiWeight = json.load(f)
 
-  samples = {}
-
-  for samples_shorthand in lumiWeight:
-    if samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
-      samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/{samples_shorthand}*/*/*/*/*root')
-
-  if 'data' in find_samples.samples_to_run[args.baseprocessor]:
-    samples['data'] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/SingleMuon/*/*/*/*root')
-
-  #if args.parsl:
-  #  for samples_shorthand in samples: 
-  #    samples[samples_shorthand] = [i.replace('/hdfs','root://cmsxrootd.hep.wisc.edu/') for i in samples[samples_shorthand]]
-  rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
   processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 
   processor_instance = load(processorpath)
 #  pre_executor = processor.futures_executor #parsl_executor#(config=parsl_local_config(os.cpu_count()))
 #  pre_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Preprocessing {args.baseprocessor} {args.year} ', 'workers': os.cpu_count()} #'config': parsl_local_config(10)}#, 'workers': os.cpu_count()}
-  result = processor.run_uproot_job(
+  sample_groups = ['signal']#, 'data', 'diboson', 'top', 'dy', 'higgs', 'ewk']
+  outputPath = f"./results/{args.year}/{args.baseprocessor}"
+  Path(outputPath).mkdir(parents=True, exist_ok=True)
+
+  import time
+  t_start = time.perf_counter()
+
+  for group in sample_groups:
+    samples = {}
+    for samples_shorthand in find_samples.samples_to_run[group]:
+  #    if args.parsl:
+       samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/{samples_shorthand}*/*/*/*/*root')
+  #    else:
+      #samples[samples_shorthand] = glob.glob(f'root://cmsxrootd.hep.wisc.edu//store/user/kaho/NanoPost_{args.year}/{samples_shorthand}*/*/*/*/*root')
+    rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
+    executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} {group} '}#, 'config': htex}
+
+    result = processor.run_uproot_job(
       samples,
       "Events",
       processor_instance,
@@ -82,14 +83,10 @@ if __name__ == '__main__':
       chunksize=200000  
       #pre_executor,
       #pre_args
-  )
-  outputPath = f"./results/{args.year}/{args.baseprocessor}"
-  Path(outputPath).mkdir(parents=True, exist_ok=True)
-  if args.subfix:
-    save(result, f"{outputPath}/output_{args.subfix}.coffea")
-  else:
-    save(result, f"{outputPath}/output.coffea")
-
+    )
+    save(result, f"{outputPath}/output_{group}.coffea")
+  t_stop = time.perf_counter()
+  print("Elapsed time (s):", t_stop-t_start)  
   if args.parsl:
     parsl.dfk().cleanup()
     parsl.clear()

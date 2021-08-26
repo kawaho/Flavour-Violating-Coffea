@@ -32,12 +32,20 @@ datadefs['DYJetsToLL_2J'] = 361.4 #+-3.704 RunIISummer20UL16MiniAOD-106X_mcRun2_
 #lfv NNLO
 datadefs['DYJetsToLL_M-10to50'] = 18610.0 #15890.0+-24.94 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
 
+#NLO 
 #61526.7 NNLO Htt
 #https://twiki.cern.ch/twiki/bin/viewauth/CMS/HowToGenXSecAnalyzer#Running_the_GenXSecAnalyzer_on_a
-datadefs['WJetsToLNu_TuneCP5'] = 53870.0 #TODO GenXSecAnalyzer
+#datadefs['WJetsToLNu_TuneCP5'] = 53870.0 #TODO GenXSecAnalyzer
 datadefs['WJetsToLNu_0J'] = 53330.0 #+-90.89 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 NLO
 datadefs['WJetsToLNu_1J'] = 8875.0 #+-55.31 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
 datadefs['WJetsToLNu_2J'] = 3338.0 #+-34.64 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
+
+#LO
+datadefs['WJetsToLNu_TuneCP5'] = 53870.0 #TODO GenXSecAnalyzer
+datadefs['W1JetsToLNu'] = 53330.0 #+-90.89 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 NLO
+datadefs['W2JetsToLNu'] = 8875.0 #+-55.31 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
+datadefs['W3JetsToLNu'] = 3338.0 #+-34.64 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
+datadefs['W4JetsToLNu'] = 3338.0 #+-34.64 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
 
 datadefs['WGToLNuG_TuneCP5'] = 412.7 #+-1.027 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
 
@@ -45,6 +53,7 @@ datadefs['WGToLNuG_TuneCP5'] = 412.7 #+-1.027 RunIISummer20UL16MiniAOD-106X_mcRu
 datadefs['WW_TuneCP5'] = 118.7 #+2.5%-2.2% NNLO
 
 #lfv NNLO
+#https://indico.cern.ch/event/783842/contributions/3376363/attachments/1897033/3130087/DiBosons-Calderon_v2.pdf
 datadefs['ZZ_TuneCP5'] = 16.91 #12.17+-0.01966 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2
 datadefs['WZ_TuneCP5'] = 51.11 #27.59+-0.03993 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2
 
@@ -81,7 +90,7 @@ if __name__ == '__main__':
   datalumis = {'2016preVFP': 36330, '2016postVFP': 36330, '2017': 41476.1, '2018': 59830}
   year = '2017'
   if True: #for year in datalumis:
-    samples_names = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'/*')
+    samples_names = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'_v1p1/*')
     sample_paths = {}
     lumiWeight = {}
     for name in samples_names:

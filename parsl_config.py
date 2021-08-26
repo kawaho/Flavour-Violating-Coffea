@@ -65,7 +65,7 @@ transfer_output_files   = {log_dir}/{htex_label}
 RequestMemory           = {mem_request}
 RequestCpus             = {cores_per_job}
 +RequiresCVMFS          = True
-Requirements            = TARGET.Arch == "X86_64"
+Requirements            = TARGET.HAS_CMS_HDFS && TARGET.Arch == "X86_64"
 notification            = Complete
 '''
 #priority                = 10

@@ -8,6 +8,11 @@ class MyEMuPeak(processor.ProcessorABC):
         dataset_axis = hist.Cat("dataset", "samples")
         self._lumiWeight = lumiWeight
         self._accumulator = processor.dict_accumulator({
+            'emMass': hist.Hist(
+                "Events",
+                dataset_axis,
+                hist.Bin("emMass", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
+            ),
             'emMass_deepjet_L': hist.Hist(
                 "Events",
                 dataset_axis,
@@ -60,11 +65,11 @@ class MyEMuPeak(processor.ProcessorABC):
         trg_collections = emevents.TrigObj
 
         M_collections = M_collections[M_collections.Target==1]
-        trg_collections = trg_collections[(((trg_collections.filterBits >> 1) & 1)==1) & (trg_collections.id == 13) & (trg_collections.pt > 29) & (ak.num(M_collections) == 1)]
+        trg_collections = trg_collections[(((trg_collections.filterBits >> 1) & 1)==1) & (trg_collections.id == 13)]
 
         trg_Match = ak.any((M_collections[:,0].delta_r(trg_collections) < 0.5),1)
 
-        return emevents[trg_Match & (ak.num(trg_collections) == 1)]
+        return emevents[trg_Match]
    
     def Corrections(self, emevents):
         Electron_collections = emevents.Electron[emevents.Electron.Target==1]
@@ -87,7 +92,7 @@ class MyEMuPeak(processor.ProcessorABC):
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange]	
  
     def SF(self, emevents):
-        if emevents.metadata["dataset"]=='data': return ak.sum(emevents.Jet.passDeepJet_L,1)==0, ak.sum(emevents.Jet.passDeepJet_M,1)==0#, ak.sum(emevents.Jet.passDeepCSV_L,1)==0, ak.sum(emevents.Jet.passDeepCSV_M,1)==0
+        if emevents.metadata["dataset"]=='data': return numpy.ones(len(emevents)), ak.sum(emevents.Jet.passDeepJet_L,1)==0, ak.sum(emevents.Jet.passDeepJet_M,1)==0#, ak.sum(emevents.Jet.passDeepCSV_L,1)==0, ak.sum(emevents.Jet.passDeepCSV_M,1)==0
         #Get bTag SF
         bTagJetSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
         bTagJetSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
@@ -106,7 +111,7 @@ class MyEMuPeak(processor.ProcessorABC):
         #Electron SF
         SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF*self._lumiWeight[emevents.metadata["dataset"]]
         
-        return SF*bTagJetSF_L, SF*bTagJetSF_M#, SF*bTagCSVSF_L, SF*bTagCSVSF_M
+        return SF, SF*bTagJetSF_L, SF*bTagJetSF_M#, SF*bTagCSVSF_L, SF*bTagCSVSF_M
         
     # we will receive a NanoEvents instead of a coffea DataFrame
     def process(self, events):
@@ -114,9 +119,14 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents = self.Vetos(events)
         if len(emevents)>0:
           emevents, Electron_collections, Muon_collections = self.Corrections(emevents)
-          weight_deepjet_L, weight_deepjet_M = self.SF(emevents)
+          weight, weight_deepjet_L, weight_deepjet_M = self.SF(emevents)
           #weight_deepjet_L, weight_deepjet_M, weight_deepcsv_L, weight_deepcsv_M = self.SF(emevents)
           emu = Muon_collections + Electron_collections
+          out['emMass'].fill(
+              dataset=emevents.metadata["dataset"],
+              emMass=emu.mass, 
+              weight=weight
+          )
           out['emMass_deepjet_L'].fill(
               dataset=emevents.metadata["dataset"],
               emMass_deepjet_L=emu.mass, 
