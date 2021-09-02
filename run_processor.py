@@ -60,10 +60,10 @@ if __name__ == '__main__':
 
   for samples_shorthand in lumiWeight:
     if samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
-      samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/{samples_shorthand}*/*/*/*/*root')
+      samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}_v1p2/{samples_shorthand}*/*/*/*/*root')
 
   if 'data' in find_samples.samples_to_run[args.baseprocessor]:
-    samples['data'] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/SingleMuon/*/*/*/*root')
+    samples['data'] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}_v1p2/SingleMuon/*/*/*/*root')
 
   #if args.parsl:
   #  for samples_shorthand in samples: 

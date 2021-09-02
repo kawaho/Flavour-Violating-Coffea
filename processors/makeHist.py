@@ -19,26 +19,26 @@ class MyEMuPeak(processor.ProcessorABC):
           #      dataset_axis,
           #      hist.Bin("emMass", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
           #  ),
-          #  'ePt': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("ePt", r"$p^{e}_{T}$ [GeV]", 40, 24, 200),
-          #  ),
-          #  'mPt': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("mPt", r"$p^{\mu}_{T}$ [GeV]", 40, 24, 200),
-          #  ),
-          #  'eEta': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("eEta", r"$\eta^{e}$", 50, -2.5, 2.5),
-          #  ),
-          #  'mEta': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("mEta", r"$\eta^{\mu}$", 50, -2.4, 2.4),
-          #  ),
+            'ePt': hist.Hist(
+                "Events",
+                dataset_axis,
+                hist.Bin("ePt", r"$p^{e}_{T}$ [GeV]", 40, 24, 200),
+            ),
+            'mPt': hist.Hist(
+                "Events",
+                dataset_axis,
+                hist.Bin("mPt", r"$p^{\mu}_{T}$ [GeV]", 40, 24, 200),
+            ),
+            'eEta': hist.Hist(
+                "Events",
+                dataset_axis,
+                hist.Bin("eEta", r"$\eta^{e}$", 50, -2.5, 2.5),
+            ),
+            'mEta': hist.Hist(
+                "Events",
+                dataset_axis,
+                hist.Bin("mEta", r"$\eta^{\mu}$", 50, -2.4, 2.4),
+            ),
             'j1Pt': hist.Hist(
                 "Events",
                 dataset_axis,
@@ -59,47 +59,47 @@ class MyEMuPeak(processor.ProcessorABC):
                 dataset_axis,
                 hist.Bin("j2Eta", r"$\eta^{j_{2}}$", 30, -5, 5),
             ),
-            'jEta-Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("jEta", r"$\eta^{j}$", 30, -5, 5),
-                hist.Bin("jPt", r"$p^{j}_{T}$ [GeV]", [30, 50, 100, 500], 30, 500)
-            ),
-            'j1Eta-Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j1Eta", r"$\eta^{j_{1}}$", 30, -5, 5),
-                hist.Bin("j1Pt", r"$p^{j_{1}}_{T}$ [GeV]", [30, 50, 100, 500], 30, 500)
-            ),
-            'j2Eta-Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j2Eta", r"$\eta^{j_{2}}$", 30, -5, 5),
-                hist.Bin("j2Pt", r"$p^{j_{2}}_{T}$ [GeV]", [30, 50, 100, 200], 30, 200)
-            ),
-            'jEta-Phi': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("jEta", r"$\eta^{j}$", 30, -5, 5),
-                hist.Bin("jPhi", r"$\phi^{j}$", 20, -3.2, 3.2)
-            ),
-            'j1Eta-Phi': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j1Eta", r"$\eta^{j_{1}}$", 30, -5, 5),
-                hist.Bin("j1Phi", r"$\phi^{j_{1}}$", 20, -3.2, 3.2)
-            ),
-            'j2Eta-Phi': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j2Eta", r"$\eta^{j_{2}}$", 30, -5, 5),
-                hist.Bin("j2Phi", r"$\phi^{j_{2}}$", 20, -3.2, 3.2)
-            ),
-            'njets': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("njets", "Number of Jets", 10, 0, 10),
-            ),
+#            'jEta-Pt': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("jEta", r"$\eta^{j}$", 30, -5, 5),
+#                hist.Bin("jPt", r"$p^{j}_{T}$ [GeV]", [30, 50, 100, 500], 30, 500)
+#            ),
+#            'j1Eta-Pt': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("j1Eta", r"$\eta^{j_{1}}$", 30, -5, 5),
+#                hist.Bin("j1Pt", r"$p^{j_{1}}_{T}$ [GeV]", [30, 50, 100, 500], 30, 500)
+#            ),
+#            'j2Eta-Pt': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("j2Eta", r"$\eta^{j_{2}}$", 30, -5, 5),
+#                hist.Bin("j2Pt", r"$p^{j_{2}}_{T}$ [GeV]", [30, 50, 100, 200], 30, 200)
+#            ),
+#            'jEta-Phi': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("jEta", r"$\eta^{j}$", 30, -5, 5),
+#                hist.Bin("jPhi", r"$\phi^{j}$", 20, -3.2, 3.2)
+#            ),
+#            'j1Eta-Phi': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("j1Eta", r"$\eta^{j_{1}}$", 30, -5, 5),
+#                hist.Bin("j1Phi", r"$\phi^{j_{1}}$", 20, -3.2, 3.2)
+#            ),
+#            'j2Eta-Phi': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("j2Eta", r"$\eta^{j_{2}}$", 30, -5, 5),
+#                hist.Bin("j2Phi", r"$\phi^{j_{2}}$", 20, -3.2, 3.2)
+#            ),
+#            'njets': hist.Hist(
+#                "Events",
+#                dataset_axis,
+#                hist.Bin("njets", "Number of Jets", 10, 0, 10),
+#            ),
         #    'emumass2D': hist.Hist(
         #        "Events",
         #        dataset_axis,
@@ -152,7 +152,8 @@ class MyEMuPeak(processor.ProcessorABC):
         trg_collections = emevents.TrigObj
 
         M_collections = M_collections[M_collections.Target==1]
-        trg_collections = trg_collections[(((trg_collections.filterBits >> 1) & 1)==1) & (trg_collections.id == 13)]
+        #https://github.com/cms-sw/cmssw/blob/master/PhysicsTools/NanoAOD/python/triggerObjects_cff.py#L60
+        trg_collections = trg_collections[trg_collections.id == 13]
 
         trg_Match = ak.any((M_collections[:,0].delta_r(trg_collections) < 0.5),1)
 
@@ -200,29 +201,40 @@ class MyEMuPeak(processor.ProcessorABC):
         elif emevents.metadata["dataset"] == 'SingleMuon' or emevents.metadata["dataset"] == 'data':
             massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         else:
-            massRange = (emVar.mass<160) & (emVar.mass>110)
-            #massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
+            #massRange = (emVar.mass<160) & (emVar.mass>110)
+            massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
  
     def SF(self, emevents):
-        if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': return numpy.ones(len(emevents))
+        if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': return ak.sum(emevents.Jet.passDeepJet_M,1)==0 #numpy.ones(len(emevents))
         #Get bTag SF
-        bTagSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
-        bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
+        bJet_collections = emevents.Jet[emevents.Jet.passDeepJet_M==1]   
+        bJet_collections = bJet_collections[ak.argsort(bJet_collections.pt_nom, axis=1, ascending=False)]
+        bTagSF_M = ak.pad_none(bJet_collections.btagSF_deepjet_M, target=2)
+        bTagSF_M = ak.fill_none(bTagSF_M, 0)
+        bTagSF_M = (1-bTagSF_M[:,0])*(1-bTagSF_M[:,1])
+
+        #bTagSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
+        #bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
 
         #PU/PF/Gen Weights
-        SF = emevents.puWeight*emevents.PrefireWeight*emevents.genWeight
+        if self._year == '2018':
+          SF = emevents.puWeight*emevents.genWeight
+        else:
+          SF = emevents.puWeight*emevents.PrefireWeight*emevents.genWeight
 
         Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
         Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
         
         #Muon SF
-        SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF
+        SF = bTagSF_M*SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF
 
-        #Electron SF
-        SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF
-        
-        return SF*self._lumiWeight[emevents.metadata["dataset"]]
+        #Electron SF and lumi
+        SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF*self._lumiWeight[emevents.metadata["dataset"]]
+
+        SF = SF.to_numpy()
+        SF[abs(SF)>10] = 0
+        return SF
         
     # we will receive a NanoEvents instead of a coffea DataFrame
     def process(self, events):
@@ -248,7 +260,7 @@ class MyEMuPeak(processor.ProcessorABC):
           elif "data" in emevents.metadata["dataset"]:
             sample_group_name = "data"
           elif "LFV" in emevents.metadata["dataset"]:
-            sample_group_name = emevents.metadata["dataset"] #r'$H\rightarrow e\mu$ (BR=1%)'
+            sample_group_name = r'$H\rightarrow e\mu$ (BR=1%)'
           out['MET'].fill(
                dataset=sample_group_name,
                MET=MET_collections.pt, 
@@ -259,26 +271,26 @@ class MyEMuPeak(processor.ProcessorABC):
 #              emMass=emu.mass, 
 #              weight=weight
 #          )
-#          out['ePt'].fill(
-#              dataset=sample_group_name,
-#              ePt=Electron_collections.pt, 
-#              weight=weight
-#          )
-#          out['mPt'].fill(
-#              dataset=sample_group_name,
-#              mPt=Muon_collections.pt, 
-#              weight=weight
-#          )
-#          out['eEta'].fill(
-#              dataset=sample_group_name,
-#              eEta=Electron_collections.eta, 
-#              weight=weight
-#          )
-#          out['mEta'].fill(
-#              dataset=sample_group_name,
-#              mEta=Muon_collections.eta, 
-#              weight=weight
-#          )
+          out['ePt'].fill(
+              dataset=sample_group_name,
+              ePt=Electron_collections.pt, 
+              weight=weight
+          )
+          out['mPt'].fill(
+              dataset=sample_group_name,
+              mPt=Muon_collections.pt, 
+              weight=weight
+          )
+          out['eEta'].fill(
+              dataset=sample_group_name,
+              eEta=Electron_collections.eta, 
+              weight=weight
+          )
+          out['mEta'].fill(
+              dataset=sample_group_name,
+              mEta=Muon_collections.eta, 
+              weight=weight
+          )
           out['j1Pt'].fill(
               dataset=sample_group_name,
               j1Pt=Jet_collections[emevents.nJet30 >= 1][:,0].pt, 
@@ -299,47 +311,47 @@ class MyEMuPeak(processor.ProcessorABC):
               j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
               weight=weight[emevents.nJet30 >= 2]
           )
-          out['jEta-Pt'].fill(
-              dataset=sample_group_name,
-              jEta=ak.flatten(Jet_collections[emevents.nJet30 >= 1].eta), 
-              jPt=ak.flatten(Jet_collections[emevents.nJet30 >= 1].pt), 
-              weight=numpy.repeat(ak.to_numpy(weight[emevents.nJet30 >= 1]), ak.num(Jet_collections[emevents.nJet30 >= 1].pt)) 
-          )
-          out['j1Eta-Pt'].fill(
-              dataset=sample_group_name,
-              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
-              j1Pt=Jet_collections[emevents.nJet30 >= 1][:,0].pt, 
-              weight=weight[emevents.nJet30 >= 1]
-          )
-          out['j2Eta-Pt'].fill(
-              dataset=sample_group_name,
-              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
-              j2Pt=Jet_collections[emevents.nJet30 >= 2][:,1].pt, 
-              weight=weight[emevents.nJet30 >= 2]
-          )
-          out['jEta-Phi'].fill(
-              dataset=sample_group_name,
-              jEta=ak.flatten(Jet_collections[emevents.nJet30 >= 1].eta), 
-              jPhi=ak.flatten(Jet_collections[emevents.nJet30 >= 1].phi), 
-              weight=numpy.repeat(ak.to_numpy(weight[emevents.nJet30 >= 1]), ak.num(Jet_collections[emevents.nJet30 >= 1].eta)) 
-          )
-          out['j1Eta-Phi'].fill(
-              dataset=sample_group_name,
-              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
-              j1Phi=Jet_collections[emevents.nJet30 >= 1][:,0].phi, 
-              weight=weight[emevents.nJet30 >= 1]
-          )
-          out['j2Eta-Phi'].fill(
-              dataset=sample_group_name,
-              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
-              j2Phi=Jet_collections[emevents.nJet30 >= 2][:,1].phi, 
-              weight=weight[emevents.nJet30 >= 2]
-          )
-          out['njets'].fill(
-              dataset=sample_group_name,
-              njets=emevents.nJet30, 
-              weight=weight
-          )
+#          out['jEta-Pt'].fill(
+#              dataset=sample_group_name,
+#              jEta=ak.flatten(Jet_collections[emevents.nJet30 >= 1].eta), 
+#              jPt=ak.flatten(Jet_collections[emevents.nJet30 >= 1].pt), 
+#              weight=numpy.repeat(ak.to_numpy(weight[emevents.nJet30 >= 1]), ak.num(Jet_collections[emevents.nJet30 >= 1].pt)) 
+#          )
+#          out['j1Eta-Pt'].fill(
+#              dataset=sample_group_name,
+#              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
+#              j1Pt=Jet_collections[emevents.nJet30 >= 1][:,0].pt, 
+#              weight=weight[emevents.nJet30 >= 1]
+#          )
+#          out['j2Eta-Pt'].fill(
+#              dataset=sample_group_name,
+#              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
+#              j2Pt=Jet_collections[emevents.nJet30 >= 2][:,1].pt, 
+#              weight=weight[emevents.nJet30 >= 2]
+#          )
+#          out['jEta-Phi'].fill(
+#              dataset=sample_group_name,
+#              jEta=ak.flatten(Jet_collections[emevents.nJet30 >= 1].eta), 
+#              jPhi=ak.flatten(Jet_collections[emevents.nJet30 >= 1].phi), 
+#              weight=numpy.repeat(ak.to_numpy(weight[emevents.nJet30 >= 1]), ak.num(Jet_collections[emevents.nJet30 >= 1].eta)) 
+#          )
+#          out['j1Eta-Phi'].fill(
+#              dataset=sample_group_name,
+#              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
+#              j1Phi=Jet_collections[emevents.nJet30 >= 1][:,0].phi, 
+#              weight=weight[emevents.nJet30 >= 1]
+#          )
+#          out['j2Eta-Phi'].fill(
+#              dataset=sample_group_name,
+#              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
+#              j2Phi=Jet_collections[emevents.nJet30 >= 2][:,1].phi, 
+#              weight=weight[emevents.nJet30 >= 2]
+#          )
+#          out['njets'].fill(
+#              dataset=sample_group_name,
+#              njets=emevents.nJet30, 
+#              weight=weight
+#          )
           #out['emumass2D'].fill(
           #    dataset=emevents.metadata["dataset"],
           #    emumass=emu.mass, 
@@ -354,7 +366,7 @@ class MyEMuPeak(processor.ProcessorABC):
         return accumulator
 
 if __name__ == '__main__':
-  years = ['2017']
+  years = ['2017','2018']
   for year in years:
     with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)

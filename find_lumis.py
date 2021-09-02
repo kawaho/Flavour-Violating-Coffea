@@ -41,11 +41,11 @@ datadefs['WJetsToLNu_1J'] = 8875.0 #+-55.31 RunIISummer20UL16MiniAOD-106X_mcRun2
 datadefs['WJetsToLNu_2J'] = 3338.0 #+-34.64 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
 
 #LO
-datadefs['WJetsToLNu_TuneCP5'] = 53870.0 #TODO GenXSecAnalyzer
-datadefs['W1JetsToLNu'] = 53330.0 #+-90.89 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 NLO
-datadefs['W2JetsToLNu'] = 8875.0 #+-55.31 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
-datadefs['W3JetsToLNu'] = 3338.0 #+-34.64 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
-datadefs['W4JetsToLNu'] = 3338.0 #+-34.64 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 NLO
+datadefs['WJetsToLNu_TuneCP5'] = 53870.0 #+-129.7 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2
+datadefs['W1JetsToLNu'] = 8927.0 #+-24.09 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1
+datadefs['W2JetsToLNu'] = 2809.0 #+-8.201 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1
+datadefs['W3JetsToLNu'] = 826.3 #+-2.511 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 
+datadefs['W4JetsToLNu'] = 3338.0 #+-34.64 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v1 
 
 datadefs['WGToLNuG_TuneCP5'] = 412.7 #+-1.027 RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2 LO
 
@@ -87,10 +87,10 @@ def mclumi(sample):
   return -1, -1
 
 if __name__ == '__main__':
-  datalumis = {'2016preVFP': 36330, '2016postVFP': 36330, '2017': 41476.1, '2018': 59830}
-  year = '2017'
+  datalumis = {'2016preVFP': 36330, '2016postVFP': 36330, '2017': 41476.1, '2018': 59811.9}
+  year = '2018'
   if True: #for year in datalumis:
-    samples_names = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'_v1p1/*')
+    samples_names = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'_v1p2/*')
     sample_paths = {}
     lumiWeight = {}
     for name in samples_names:
@@ -120,7 +120,7 @@ if __name__ == '__main__':
         lumiWeight[sample_basename] = DYNNLO*datalumis[year]/(lumiWeight[sample_basename]+dyLumi)
       elif "WJetsToLNu_TuneCP5" in sample_basename: 
         lumiWeight[sample_basename] = WNNLO*datalumis[year]/wLumi
-      elif "WJ" in sample_basename:
+      elif "JetsToLNu" in sample_basename: 
         lumiWeight[sample_basename] = WNNLO*datalumis[year]/(lumiWeight[sample_basename]+wLumi) 
 
     with open('lumi_'+year+'.json', 'w') as f: 
