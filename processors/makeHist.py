@@ -179,12 +179,15 @@ class MyEMuPeak(processor.ProcessorABC):
 
         #MET corrections Electron
         Electron_collections['pt'] = Electron_collections['pt']/Electron_collections['eCorr']
+        Electron_collections['mass'] = Electron_collections['mass']/Electron_collections['eCorr']
         MET_collections = MET_collections+Electron_collections[:,0]
         Electron_collections['pt'] = Electron_collections['pt']*Electron_collections['eCorr']
+        Electron_collections['mass'] = Electron_collections['mass']*Electron_collections['eCorr']
         MET_collections = MET_collections-Electron_collections[:,0]
         
         #Muon pT corrections
         MET_collections = MET_collections+Muon_collections[:,0]
+        Muon_collections['mass'] = Muon_collections['mass']*Muon_collections['corrected_pt']/Muon_collections['pt']
         Muon_collections['pt'] = Muon_collections['corrected_pt']
         MET_collections = MET_collections-Muon_collections[:,0]
 
@@ -208,14 +211,14 @@ class MyEMuPeak(processor.ProcessorABC):
     def SF(self, emevents):
         if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': return ak.sum(emevents.Jet.passDeepJet_M,1)==0 #numpy.ones(len(emevents))
         #Get bTag SF
-        bJet_collections = emevents.Jet[emevents.Jet.passDeepJet_M==1]   
-        bJet_collections = bJet_collections[ak.argsort(bJet_collections.pt_nom, axis=1, ascending=False)]
-        bTagSF_M = ak.pad_none(bJet_collections.btagSF_deepjet_M, target=2)
-        bTagSF_M = ak.fill_none(bTagSF_M, 0)
-        bTagSF_M = (1-bTagSF_M[:,0])*(1-bTagSF_M[:,1])
+#        bJet_collections = emevents.Jet[emevents.Jet.passDeepJet_M==1]   
+#        bJet_collections = bJet_collections[ak.argsort(bJet_collections.pt_nom, axis=1, ascending=False)]
+#        bTagSF_M = ak.pad_none(bJet_collections.btagSF_deepjet_M, target=2)
+#        bTagSF_M = ak.fill_none(bTagSF_M, 0)
+#        bTagSF_M = (1-bTagSF_M[:,0])*(1-bTagSF_M[:,1])
 
-        #bTagSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
-        #bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
+        bTagSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
+        bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
 
         #PU/PF/Gen Weights
         if self._year == '2018':
