@@ -1,0 +1,3 @@
+[submodule "XGBoost-for-HtoEMu"]
+	path = XGBoost-for-HtoEMu
+	url = git@github.com:kawaho/XGBoost-for-HtoEMu.git
