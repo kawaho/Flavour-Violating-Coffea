@@ -22,5 +22,5 @@ for year in years:
           var_dict[i][varName.replace(f'_{i}jets','')] = result[varName].value
 for i in range(3):
     df = pd.DataFrame(var_dict[i])
-    df.to_csv(f'results/csv4BDT/out_{i}jets.csv')    
+    df.to_csv(f'results/csv4BDT/out_{i}jets.csv', index=False)    
 

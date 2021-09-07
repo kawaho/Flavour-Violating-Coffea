@@ -25,7 +25,7 @@ for key, h in hists.items():
     for dataset in h.identifiers('dataset'):
         newhist = h.integrate('dataset', dataset)
         hname = f'{key}'
-        fout[dataset][hname] = newhist.to_boost().to_numpy()
+        fout[dataset][hname] = hist.export1d(newhist)
 
 for f in fout:
     fout[f].close()
