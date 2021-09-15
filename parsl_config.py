@@ -66,7 +66,7 @@ RequestMemory           = {mem_request}
 RequestCpus             = {cores_per_job}
 +RequiresCVMFS          = True
 Requirements            = TARGET.HAS_CMS_HDFS && TARGET.Arch == "X86_64"
-notification            = Complete
+notification            = Always
 '''
 #priority                = 10
 #TARGET.HAS_CMS_HDFS
@@ -97,7 +97,7 @@ notification            = Complete
             HighThroughputExecutor(
                 label="coffea_parsl_default",
                 cores_per_worker=1,
-                max_workers=os.cpu_count(), #multicore local
+                max_workers=int(os.cpu_count()/2), #multicore local
                 worker_logdir_root=log_dir,
                 provider=LocalProvider(
                     channel=LocalChannel(),

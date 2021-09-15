@@ -1,119 +1,60 @@
 from coffea import processor, hist
 from coffea.util import save
+import xgboost as xgb
 import awkward as ak
 import numpy, json, os
 
 class MyEMuPeak(processor.ProcessorABC):
-    def __init__(self, lumiWeight, year):
-        dataset_axis = hist.Cat("dataset", "samples")
+    def __init__(self, lumiWeight, BDTmodels, year):
         self._lumiWeight = lumiWeight
+        self._BDTmodels = BDTmodels
         self._year = year
-        self.jetUnc = ['jesAbsolute', f'jesAbsolute_{year}', 'jesBBEC1', f'jesBBEC1_{year}', 'jesFlavorQCD', 'jesEC2', f'jesEC2_{year}', 'jesHF', f'jesHF_{year}', 'jesRelativeBal', f'jesRelativeSample_{year}', 'jer']
-        self._accumulator = processor.dict_accumulator({
-            'MET': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("MET", r"$E^{miss}_{T}$ [GeV]", 25, 0, 250),
-            ),
-          #  'emMass': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("emMass", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
-          #  ),
-          #  'ePt': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("ePt", r"$p^{e}_{T}$ [GeV]", 40, 24, 200),
-          #  ),
-          #  'mPt': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("mPt", r"$p^{\mu}_{T}$ [GeV]", 40, 24, 200),
-          #  ),
-          #  'eEta': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("eEta", r"$\eta^{e}$", 50, -2.5, 2.5),
-          #  ),
-          #  'mEta': hist.Hist(
-          #      "Events",
-          #      dataset_axis,
-          #      hist.Bin("mEta", r"$\eta^{\mu}$", 50, -2.4, 2.4),
-          #  ),
-            'j1Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j1Pt", r"$p^{j_{1}}_{T}$ [GeV]", 40, 30, 400),
-            ),
-            'j2Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j2Pt", r"$p^{j_{2}}_{T}$ [GeV]", 40, 30, 200),
-            ),
-            'j1Eta': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j1Eta", r"$\eta^{j_{1}}$", 30, -5, 5),
-            ),
-            'j2Eta': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j2Eta", r"$\eta^{j_{2}}$", 30, -5, 5),
-            ),
-            'jEta-Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("jEta", r"$\eta^{j}$", 30, -5, 5),
-                hist.Bin("jPt", r"$p^{j}_{T}$ [GeV]", [30, 50, 100, 500], 30, 500)
-            ),
-            'j1Eta-Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j1Eta", r"$\eta^{j_{1}}$", 30, -5, 5),
-                hist.Bin("j1Pt", r"$p^{j_{1}}_{T}$ [GeV]", [30, 50, 100, 500], 30, 500)
-            ),
-            'j2Eta-Pt': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j2Eta", r"$\eta^{j_{2}}$", 30, -5, 5),
-                hist.Bin("j2Pt", r"$p^{j_{2}}_{T}$ [GeV]", [30, 50, 100, 200], 30, 200)
-            ),
-            'jEta-Phi': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("jEta", r"$\eta^{j}$", 30, -5, 5),
-                hist.Bin("jPhi", r"$\phi^{j}$", 20, -3.2, 3.2)
-            ),
-            'j1Eta-Phi': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j1Eta", r"$\eta^{j_{1}}$", 30, -5, 5),
-                hist.Bin("j1Phi", r"$\phi^{j_{1}}$", 20, -3.2, 3.2)
-            ),
-            'j2Eta-Phi': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("j2Eta", r"$\eta^{j_{2}}$", 30, -5, 5),
-                hist.Bin("j2Phi", r"$\phi^{j_{2}}$", 20, -3.2, 3.2)
-            ),
-            'njets': hist.Hist(
-                "Events",
-                dataset_axis,
-                hist.Bin("njets", "Number of Jets", 10, 0, 10),
-            ),
-        #    'emumass2D': hist.Hist(
-        #        "Events",
-        #        dataset_axis,
-        #        hist.Bin("emumass", "e_mu mass", 50, 110, 160),
-        #        hist.Bin("ept", "e_pt", 40, 20, 200),
-        #    ),
-           
-        })
+        self.var_0jet_ = ['e_met_mT_Per_e_m_Mass', 'm_met_mT_Per_e_m_Mass', 'mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaR_e_m', 'emEta']
+        self.var_1jet_ = ['e_met_mT_Per_e_m_Mass', 'm_met_mT_Per_e_m_Mass', 'mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaR_e_m', 'emEta', 'j1pt', 'DeltaR_j1_em', 'j1Eta']
+        self.var_2jet_GG_ = ['mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaR_e_m', 'emEta', 'j1pt', 'j1Eta', 'Rpt', 'j2pt', 'j2Eta', 'DeltaEta_j1_j2', 'pt_cen_Deltapt', 'j1_j2_mass', 'DeltaR_em_j1j2', 'Zeppenfeld_DeltaEta', 'DeltaPhi_j1_j2', 'DeltaR_j1_j2']
+        self.var_2jet_VBF_ = ['mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaR_e_m', 'emEta', 'j1pt', 'j1Eta', 'Rpt', 'j2pt', 'j2Eta', 'DeltaEta_j1_j2', 'pt_cen_Deltapt', 'j1_j2_mass', 'DeltaR_em_j1j2', 'Zeppenfeld_DeltaEta', 'DeltaPhi_j1_j2', 'DeltaR_j1_j2']
+
+        self.var_mu_ = []
+        self.var_ele_ = []
+        self.var_met_ = []
+        self.var_j1_ = []
+        self.var_j2_ = []
+
+
+        self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal', 'jer']
+        self.jetyearUnc = sum([[f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}', f'UnclusteredEn_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
+        self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
+        self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017']
+        self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
+        self.leptonUnc = ['ees', 'eer', 'me']
+        self._accumulator = processor.dict_accumulator({})
+        self._accumulator['e_m_Mass'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator['mva'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator['weight'] = processor.column_accumulator(numpy.array([]))
+
+        for sys in self.jetUnc+self.jetyearUnc+self.leptonUnc:
+            self._accumulator['mva_'+sys+'_Up'] = processor.column_accumulator(numpy.array([]))
+            self._accumulator['mva_'+sys+'_Down'] = processor.column_accumulator(numpy.array([]))
+        for sys in self.theoUnc:
+            self._accumulator['weight_'+sys] = processor.column_accumulator(numpy.array([]))
+        for sys in self.sfUnc:
+            self._accumulator['weight_'+sys+'_Up'] = processor.column_accumulator(numpy.array([]))
+            self._accumulator['weight_'+sys+'_Down'] = processor.column_accumulator(numpy.array([]))
+        for sys in self.leptonUnc:
+            self._accumulator['e_m_Mass_'+sys+'_Up'] = processor.column_accumulator(numpy.array([]))
+            self._accumulator['e_m_Mass_'+sys+'_Down'] = processor.column_accumulator(numpy.array([]))
 
     @property
     def accumulator(self):
         return self._accumulator
     
+    def BDTscore(self, njets, XFrame, isVBF=False):
+        if isVBF:
+           model_load = self._BDTmodels["model_VBF_2jets"]
+        else:
+           model_load = self._BDTmodels[f"model_GG_{njets}jets"]
+        return model_load.predict_proba(XFrame)
+
     def Vetos(self, events):
         if self._year == '2016preVFP':
           mpt_threshold = 26
@@ -186,6 +127,7 @@ class MyEMuPeak(processor.ProcessorABC):
         
         #Muon pT corrections
         MET_collections = MET_collections+Muon_collections[:,0]
+        Muon_collections['mass'] = Muon_collections['mass']*Muon_collections['corrected_pt']/Muon_collections['pt']
         Muon_collections['pt'] = Muon_collections['corrected_pt']
         MET_collections = MET_collections-Muon_collections[:,0]
 
@@ -199,72 +141,220 @@ class MyEMuPeak(processor.ProcessorABC):
 
         if 'LFV' in emevents.metadata["dataset"]:
             massRange = (emVar.mass<160) & (emVar.mass>110)
-        elif emevents.metadata["dataset"] == 'SingleMuon' or emevents.metadata["dataset"] == 'data':
+        else:
             massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
-        else:
-            massRange = (emVar.mass<160) & (emVar.mass>110)
-            #massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
- 
+    
     def SF(self, emevents):
-        if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': return numpy.ones(len(emevents))
-        #Get bTag SF
-        bTagSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
-        bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
-
-        #PU/PF/Gen Weights
-        if self._year == '2018':
-          SF = emevents.puWeight*emevents.genWeight
+        if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
+           SF = ak.sum(emevents.Jet.passDeepJet_M,1)==0 #numpy.ones(len(emevents))
+           emevents["weight"] = SF
         else:
-          SF = emevents.puWeight*emevents.PrefireWeight*emevents.genWeight
+           #Get bTag SF
+           #bTagSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
+           bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
 
-        Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
-        Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
+           SF = bTagSF_M*emevents.puWeight*emevents.genWeight
+
+           #PU/PF/Gen Weights
+           if self._year != '2018':
+             SF = SF*emevents.PrefireWeight
+
+           Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
+           Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
+           
+           #Muon SF
+           SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF
+
+           #Electron SF and lumi
+           SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF*self._lumiWeight[emevents.metadata["dataset"]]
+           SF = SF.to_numpy()
+           SF[abs(SF)>10] = 0
+           emevents["weight"] = SF
+         
+           for other_year in ['2016preVFP', '2016postVFP', '2017', '2018']:
+             emevents[f"weight_bTag_{other_year}_Up"] = SF
+             emevents[f"weight_bTag_{other_year}_Down"] = SF
+             emevents[f"pu_{other_year}_Up"] = SF
+             emevents[f"pu_{other_year}_Down"] = SF
+           for other_year in ['2016preVFP', '2016postVFP', '2017']:
+             emevents[f"pf_{other_year}_Up"] = SF
+             emevents[f"pf_{other_year}_Down"] = SF
+
+	   #bTag Up/Down
+	   bTagSF_M_Down = ak.prod(1-emevents.Jet.btagSF_deepjet_M*Jet_btagSF_deepjet_M_down, axis=1)
+	   bTagSF_M_Up = ak.prod(1-emevents.Jet.btagSF_deepjet_M*Jet_btagSF_deepjet_M_up, axis=1)
+	   emevents[f"weight_bTag_{self._year}_Up"] = SF*bTagSF_M_Up/bTagSF_M
+	   emevents[f"weight_bTag_{self._year}_Down"] = SF*bTagSF_M_Down/bTagSF_M
+
+           #PU Up/Down 
+           emevents[f"weight_pu_{self._year}_Up"] = SF*emevents.puWeightUp/emevents.puWeight
+           emevents[f"weight_pu_{self._year}_Down"] = SF*emevents.puWeightDown/emevents.puWeight
+
+	   #Pre-firing Up/Down
+           if self._year != '2018':
+    	     emevents[f"weight_pf_{self._year}_Up"] = SF*emevents.PrefireWeight_Up/emevents.PrefireWeight
+	     emevents[f"weight_pf_{self._year}_Down"] = SF*emevents.PrefireWeight_Down/emevents.PrefireWeight
+
+	   #Scale uncertainty
+	   emevents[f"weight_scalep5p5"] = SF*emevents.LHEScaleWeight[:,0]
+	   emevents[f"weight_scale22"] = SF*emevents.LHEScaleWeight[:,8]
+
+	   #PDF and alpha_s
+	   #https://lhapdfsets.web.cern.ch/current/NNPDF31_nnlo_as_0118_mc_hessian_pdfas/NNPDF31_nnlo_as_0118_mc_hessian_pdfas.info
+	   #SF_theory[0] ... etc
+	   emevents[f"weight_lhe"] = numpy.einsum("ij,i->ij", emevents.LHEPdfWeight.to_numpy(), SF) 
         
-        #Muon SF
-        SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF
-
-        #Electron SF
-        SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF
-        
-        return SF*self._lumiWeight[emevents.metadata["dataset"]]
-
-      
-    def fill_sys(self, emevents):
+    def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
+        #make interesting variables
+        #zero/any no. of jets
         #Muon Energy Scale + Reso
         tmpMET_collections = ak.copy(MET_collections)
         tmpMET_collections = tmpMET_collections+Muon_collections[:,0]
-        Muon_collections['pt'] = Muon_collections['correctedUp_pt']
+        tmpMuon_collections = ak.copy(Muon_collections)
+        tmpMuon_collections['pt'] = tmpMuon_collections['correctedUp_pt']
         tmpMET_collections = tmpMET_collections-Muon_collections[:,0]
+
+        emVar = Electron_collections + Muon_collections
+        emevents["eEta"] = Electron_collections.eta
+        emevents["mEta"] = Muon_collections.eta
+
+        emevents["mpt_Per_e_m_Mass_meUp"] = Muon_collections.eta
+        emevents["mpt_Per_e_m_Mass_meDown"] = Muon_collections.eta
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emVar.mass
+        emevents["ept_Per_e_m_Mass"] = Electron_collections.pt/emVar.mass
+        emevents["empt"] = emVar.pt
+        emevents["emEta"] = emVar.eta
+        emevents["DeltaEta_e_m"] = abs(Muon_collections.eta - Electron_collections.eta)
+        emevents["DeltaPhi_e_m"] = Muon_collections.delta_phi(Electron_collections)
+        emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
+        emevents["Rpt_0"] = Rpt(Muon_collections, Electron_collections)
+
+        emevents["met"] = MET_collections.pt
+
+        emevents["e_met_mT"] = mT(Electron_collections, MET_collections)
+        emevents["m_met_mT"] = mT(Muon_collections, MET_collections)
+        emevents["e_met_mT_Per_e_m_Mass"] = emevents["e_met_mT"]/emVar.mass
+        emevents["m_met_mT_Per_e_m_Mass"] = emevents["m_met_mT"]/emVar.mass
+
+        pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
+        emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
+        emevents["pZeta15"] = pZeta_ - 1.5*pZetaVis_
+        emevents["pZeta"] = pZeta_
+        emevents["pZetaVis"] = pZetaVis_
+
+        #one jets
+        onejets_emevents = emevents[emevents.nJet30 >= 1]
+        Electron_collections_1jet = Electron_collections[emevents.nJet30 >= 1]
+        Muon_collections_1jet = Muon_collections[emevents.nJet30 >= 1]
+        emVar_1jet = Electron_collections_1jet + Muon_collections_1jet
+        Jet_collections_1jet = Jet_collections[emevents.nJet30 >= 1]
+
+        onejets_emevents['j1pt'] = Jet_collections_1jet[:,0].pt
+        onejets_emevents['j1Eta'] = Jet_collections_1jet[:,0].eta
+
+        onejets_emevents["DeltaEta_j1_em"] = abs(Jet_collections_1jet[:,0].eta - emVar_1jet.eta)
+        onejets_emevents["DeltaPhi_j1_em"] = Jet_collections_1jet[:,0].delta_phi(emVar_1jet)
+        onejets_emevents["DeltaR_j1_em"] = Jet_collections_1jet[:,0].delta_r(emVar_1jet)
+
+        onejets_emevents["Zeppenfeld_1"] = Zeppenfeld(Muon_collections_1jet, Electron_collections_1jet, [Jet_collections_1jet[:,0]])
+        onejets_emevents["Rpt_1"] = Rpt(Muon_collections_1jet, Electron_collections_1jet, [Jet_collections_1jet[:,0]])
+
+        #2 or more jets
+        Multijets_emevents = onejets_emevents[onejets_emevents.nJet30 >= 2]
+        Electron_collections_2jet = Electron_collections_1jet[onejets_emevents.nJet30 >= 2]
+        Muon_collections_2jet = Muon_collections_1jet[onejets_emevents.nJet30 >= 2]
+        emVar_2jet = Electron_collections_2jet + Muon_collections_2jet
+        Jet_collections_2jet = Jet_collections_1jet[onejets_emevents.nJet30 >= 2]
+
+        Multijets_emevents['j2pt'] = Jet_collections_2jet[:,1].pt
+        Multijets_emevents['j2Eta'] = Jet_collections_2jet[:,1].eta
+        Multijets_emevents["j1_j2_mass"] = (Jet_collections_2jet[:,0] + Jet_collections_2jet[:,1]).mass
+
+        Multijets_emevents["DeltaEta_em_j1j2"] = abs((Jet_collections_2jet[:,0] + Jet_collections_2jet[:,1]).eta - emVar_2jet.eta)
+        Multijets_emevents["DeltaPhi_em_j1j2"] = (Jet_collections_2jet[:,0] + Jet_collections_2jet[:,1]).delta_phi(emVar_2jet)
+        Multijets_emevents["DeltaR_em_j1j2"] = (Jet_collections_2jet[:,0] + Jet_collections_2jet[:,1]).delta_r(emVar_2jet)
+
+        Multijets_emevents["DeltaEta_j2_em"] = abs(Jet_collections_2jet[:,1].eta - emVar_2jet.eta)
+        Multijets_emevents["DeltaPhi_j2_em"] = Jet_collections_2jet[:,1].delta_phi(emVar_2jet)
+        Multijets_emevents["DeltaR_j2_em"] = Jet_collections_2jet[:,1].delta_r(emVar_2jet)
+
+        Multijets_emevents["DeltaEta_j1_j2"] = abs(Jet_collections_2jet[:,0].eta - Jet_collections_2jet[:,1].eta)
+
+        Multijets_emevents["isVBFcat"] = ((Multijets_emevents["j1_j2_mass"] > 400) & (Multijets_emevents["DeltaEta_j1_j2"] > 2.5)) 
+
+        Multijets_emevents["DeltaPhi_j1_j2"] = Jet_collections_2jet[:,0].delta_phi(Jet_collections_2jet[:,1])
+        Multijets_emevents["DeltaR_j1_j2"] = Jet_collections_2jet[:,0].delta_r(Jet_collections_2jet[:,1])
+
+        Multijets_emevents["Zeppenfeld"] = Zeppenfeld(Muon_collections_2jet, Electron_collections_2jet, [Jet_collections_2jet[:,0], Jet_collections_2jet[:,1]])
+        Multijets_emevents["Zeppenfeld_DeltaEta"] = Multijets_emevents["Zeppenfeld"]/Multijets_emevents["DeltaEta_j1_j2"]
+        Multijets_emevents["absZeppenfeld_DeltaEta"] = abs(Multijets_emevents["Zeppenfeld_DeltaEta"])
+        Multijets_emevents["cen"] = numpy.exp(-4*Multijets_emevents["Zeppenfeld_DeltaEta"]**2)
+
+        Multijets_emevents["Rpt"] = Rpt(Muon_collections_2jet, Electron_collections_2jet, [Jet_collections_2jet[:,0], Jet_collections_2jet[:,1]])
+
+        Multijets_emevents["pt_cen"] = pt_cen(Muon_collections_2jet, Electron_collections_2jet, [Jet_collections_2jet[:,0], Jet_collections_2jet[:,1]])
+        Multijets_emevents["pt_cen_Deltapt"] = Multijets_emevents["pt_cen"]/(Jet_collections_2jet[:,0] - Jet_collections_2jet[:,1]).pt
+        Multijets_emevents["abspt_cen_Deltapt"] = abs(Multijets_emevents["pt_cen_Deltapt"])
+
+        Multijets_emevents["Ht_had"] = ak.sum(Jet_collections_2jet.pt, 1)
+        Multijets_emevents["Ht"] = ak.sum(Jet_collections_2jet.pt, 1) + Muon_collections_2jet.pt + Electron_collections_2jet.pt
+        return emevents, onejets_emevents, Multijets_emevents[Multijets_emevents.isVBFcat==0], Multijets_emevents[Multijets_emevents.isVBFcat==1]
+
+    def fill_sys(self, emevents_0jet, emevents_1jet, emevents_2jet_GG, emevents_2jet_VBF):
+        #Muon Energy Scale + Reso
+        tmpMET_collections = ak.copy(MET_collections)
+        tmpMET_collections = tmpMET_collections+Muon_collections[:,0]
+        tmpMuon_collections = ak.copy(Muon_collections)
+        tmpMuon_collections['pt'] = tmpMuon_collections['correctedUp_pt']
+        tmpMET_collections = tmpMET_collections-Muon_collections[:,0]
+
+        #recalculate needed variables
+
+        Xframe_0jet = ak.to_pandas(emevents[emevents.nJet30 == 0][self.var_0jet_])
+        Xframe_1jet = ak.to_pandas(onejets_emevents[onejets_emevents.nJet30 == 1][self.var_1jet_])
+        Xframe_2jet_GG = ak.to_pandas(Multijets_emevents_GG[self.var_2jet_])
+        Xframe_2jet_VBF = ak.to_pandas(Multijets_emevents_VBF[self.var_2jet_])
+
+        emevents['e_m_Mass_me_Up'] = (Muon_collections+Electron_collections).mass 
+        emevents[emevents.nJet30 == 0]['mva_me_Up'] = self.BDTscore(0, Xframe_0jet)[:,1] 
+        onejets_emevents[onejets_emevents.nJet30 == 1]['mva_me_Up'] = self.BDTscore(0, Xframe_1jet)[:,1] 
+        Multijets_emevents_GG[self.var_2jet_]['mva_me_Up'] = self.BDTscore(0, Xframe_2jet_GG)[:,1] 
+        Multijets_emevents_VBF[self.var_2jet_]['mva_me_Up'] = self.BDTscore(0, Xframe_2jet_VBF)[:,1] 
+
+        emevents[emevents.nJet30 == 0]['mva'] = self.BDTscore(0, Xframe_0jet)[:,1] 
+        onejets_emevents[onejets_emevents.nJet30 == 1]['mva'] = self.BDTscore(0, Xframe_1jet)[:,1] 
+        Multijets_emevents_GG[self.var_2jet_]['mva'] = self.BDTscore(0, Xframe_2jet_GG)[:,1] 
+        Multijets_emevents_VBF[self.var_2jet_]['mva'] = self.BDTscore(0, Xframe_2jet_VBF)[:,1] 
 
         tmpMET_collections = ak.copy(MET_collections)
         tmpMET_collections = tmpMET_collections+Muon_collections[:,0]
         Muon_collections['pt'] = Muon_collections['correctedDown_pt']
         tmpMET_collections = tmpMET_collections-Muon_collections[:,0]
+        self.interesting(emevents, Electron_collections, Muon_collections, tmpMET_collections, Jet_collections)
 
-        #PU 
-        SF_puUp = SF*emevents.puWeightUp/emevents.puWeight
-        SF_puDown = SF*emevents.puWeightDown/emevents.puWeight
+        tmpMET_collections = ak.copy(MET_collections)
+        tmpMET_collections = tmpMET_collections+Muon_collections[:,0]
+        Muon_collections['pt'] = Muon_collections['correctedDown_pt']
+        tmpMET_collections = tmpMET_collections-Muon_collections[:,0]
+        self.interesting(emevents, Electron_collections, Muon_collections, tmpMET_collections, Jet_collections)
 
-        #bTag SF
-        bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
-        bTagSF_M_Down = ak.prod(1-emevents.Jet.btagSF_deepjet_M*Jet_btagSF_deepjet_M_down, axis=1)
-        bTagSF_M_Up = ak.prod(1-emevents.Jet.btagSF_deepjet_M*Jet_btagSF_deepjet_M_up, axis=1)
-        SF_btagUp = SF*bTagSF_M_Up/bTagSF_M
-        SF_btagDown = SF*bTagSF_M_Down/bTagSF_M
+        #Electron_dEscaleDown, Electron_dEscaleUp, Electron_dEsigmaDown, Electron_dEsigmaUp
 
-        #Pre-firing
-        SF_PFUp = SF*emevents.PrefireWeight_Up/SF*emevents.PrefireWeight
-        SF_PFDown = SF*emevents.PrefireWeight_Down/SF*emevents.PrefireWeight
-
-        #Scale uncertainty
-        SF_ScaleUp = SF*emevents.LHEScaleWeight[:,0]
-        SF_ScaleDown = SF*emevents.LHEScaleWeight[:,8]
-
-        #PDF and alpha_s
-        #https://lhapdfsets.web.cern.ch/current/NNPDF31_nnlo_as_0118_mc_hessian_pdfas/NNPDF31_nnlo_as_0118_mc_hessian_pdfas.info
-        SF_theory = numpy.multiply.outer(emevents.LHEPdfWeight, SF)
-        #SF_theory[0] ... etc
 
         #Unclustered Up
         MET_collections = emevents.MET
@@ -318,140 +408,46 @@ class MyEMuPeak(processor.ProcessorABC):
            tmpMET_collections['pt'] = getattr(tmpMET_collections, f'pt_{jetUnc}Down')
            tmpMET_collections['phi'] = getattr(tmpMET_collections, f'phi_{jetUnc}Down')
 
+    def pandasDF(self, emevents_0jet, emevents_1jet, emevents_2jet_GG, emevents_2jet_VBF):
+        self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal', 'jer']
+        self.jetyearUnc = sum([[f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}', f'UnclusteredEn_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
+        self.leptonUnc = ['ees', 'eer', 'me']
 
+        self.var_mu_ = []
+        self.var_ele_ = []
+        self.var_met_ = []
+        self.var_j_ = []
 
+        for unc in self.jetUnc:
+          for updown  in ['Up', 'Down']
+            self.var_j_ = []
+            
+            var_1jet_alt = [i+f'_{unc}{updown}' if i in self.var_j1_ else i for i in self.var_2jet_] 
+            var_2jet_alt = [i+f'_{unc}{updown}' if i in self.var_j1_ else i for i in self.var_2jet_] 
 
+            Xframe_0jet = ak.to_pandas(emevents_0jet[self.var_0jet_])
+            Xframe_1jet = ak.to_pandas(emevents_1jet[var_1jet_alt_Up])
+            Xframe_2jet_GG = ak.to_pandas(emevents_2jet_GG[var_2jet_alt])
+            Xframe_2jet_VBF = ak.to_pandas(emevents_2jet_VBF[var_2jet_alt])
+   
+            emevents_0jet[f'mva_{unc}{updown}'] = self.BDTscore(0, Xframe_0jet)[:,1] 
+            emevents_1jet[f'mva_{unc}{updown}'] = self.BDTscore(0, Xframe_1jet)[:,1] 
+            emevents_2jet_GG[f'mva_{unc}{updown}'] = self.BDTscore(0, Xframe_2jet_GG)[:,1] 
+            emevents_2jet_VBF[f'mva_{unc}{updown}'] = self.BDTscore(0, Xframe_2jet_VBF)[:,1] 
 
-
-
-
-
-
-
-
-        
     # we will receive a NanoEvents instead of a coffea DataFrame
     def process(self, events):
         out = self.accumulator.identity()
         emevents = self.Vetos(events)
         if len(emevents)>0:
           emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
-          weight = self.SF(emevents)
-          emu = Muon_collections + Electron_collections
-          sample_group_name = "" 
-          if "ST" in emevents.metadata["dataset"] or "TT" in emevents.metadata["dataset"]:
-            sample_group_name = r'$t\bar{t}$,t+Jets'
-          elif "HTo" in emevents.metadata["dataset"] and not "LFV" in emevents.metadata["dataset"]:
-            sample_group_name = 'SM Higgs'
-          elif "ZZ" in emevents.metadata["dataset"] or "WZ" in emevents.metadata["dataset"] or "WW" in emevents.metadata["dataset"]:
-            sample_group_name = "Diboson"
-          elif "DY" in emevents.metadata["dataset"]:
-            sample_group_name = "DY+Jets"
-          elif "JetsToLNu" in emevents.metadata["dataset"] or "WG" in emevents.metadata["dataset"]:
-            sample_group_name = "W+Jets"
-          elif "EWK" in emevents.metadata["dataset"]:
-            sample_group_name = "EWK W/Z"
-          elif "data" in emevents.metadata["dataset"]:
-            sample_group_name = "data"
-          elif "LFV" in emevents.metadata["dataset"]:
-            sample_group_name = emevents.metadata["dataset"] #r'$H\rightarrow e\mu$ (BR=1%)'
-          out['MET'].fill(
-               dataset=sample_group_name,
-               MET=MET_collections.pt, 
-               weight=weight
-          )
-#          out['emMass'].fill(
-#              dataset=sample_group_name,
-#              emMass=emu.mass, 
-#              weight=weight
-#          )
-#          out['ePt'].fill(
-#              dataset=sample_group_name,
-#              ePt=Electron_collections.pt, 
-#              weight=weight
-#          )
-#          out['mPt'].fill(
-#              dataset=sample_group_name,
-#              mPt=Muon_collections.pt, 
-#              weight=weight
-#          )
-#          out['eEta'].fill(
-#              dataset=sample_group_name,
-#              eEta=Electron_collections.eta, 
-#              weight=weight
-#          )
-#          out['mEta'].fill(
-#              dataset=sample_group_name,
-#              mEta=Muon_collections.eta, 
-#              weight=weight
-#          )
-          out['j1Pt'].fill(
-              dataset=sample_group_name,
-              j1Pt=Jet_collections[emevents.nJet30 >= 1][:,0].pt, 
-              weight=weight[emevents.nJet30 >= 1]
-          )
-          out['j2Pt'].fill(
-              dataset=sample_group_name,
-              j2Pt=Jet_collections[emevents.nJet30 >= 2][:,1].pt, 
-              weight=weight[emevents.nJet30 >= 2]
-          )
-          out['j1Eta'].fill(
-              dataset=sample_group_name,
-              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
-              weight=weight[emevents.nJet30 >= 1]
-          )
-          out['j2Eta'].fill(
-              dataset=sample_group_name,
-              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
-              weight=weight[emevents.nJet30 >= 2]
-          )
-          out['jEta-Pt'].fill(
-              dataset=sample_group_name,
-              jEta=ak.flatten(Jet_collections[emevents.nJet30 >= 1].eta), 
-              jPt=ak.flatten(Jet_collections[emevents.nJet30 >= 1].pt), 
-              weight=numpy.repeat(ak.to_numpy(weight[emevents.nJet30 >= 1]), ak.num(Jet_collections[emevents.nJet30 >= 1].pt)) 
-          )
-          out['j1Eta-Pt'].fill(
-              dataset=sample_group_name,
-              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
-              j1Pt=Jet_collections[emevents.nJet30 >= 1][:,0].pt, 
-              weight=weight[emevents.nJet30 >= 1]
-          )
-          out['j2Eta-Pt'].fill(
-              dataset=sample_group_name,
-              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
-              j2Pt=Jet_collections[emevents.nJet30 >= 2][:,1].pt, 
-              weight=weight[emevents.nJet30 >= 2]
-          )
-          out['jEta-Phi'].fill(
-              dataset=sample_group_name,
-              jEta=ak.flatten(Jet_collections[emevents.nJet30 >= 1].eta), 
-              jPhi=ak.flatten(Jet_collections[emevents.nJet30 >= 1].phi), 
-              weight=numpy.repeat(ak.to_numpy(weight[emevents.nJet30 >= 1]), ak.num(Jet_collections[emevents.nJet30 >= 1].eta)) 
-          )
-          out['j1Eta-Phi'].fill(
-              dataset=sample_group_name,
-              j1Eta=Jet_collections[emevents.nJet30 >= 1][:,0].eta, 
-              j1Phi=Jet_collections[emevents.nJet30 >= 1][:,0].phi, 
-              weight=weight[emevents.nJet30 >= 1]
-          )
-          out['j2Eta-Phi'].fill(
-              dataset=sample_group_name,
-              j2Eta=Jet_collections[emevents.nJet30 >= 2][:,1].eta, 
-              j2Phi=Jet_collections[emevents.nJet30 >= 2][:,1].phi, 
-              weight=weight[emevents.nJet30 >= 2]
-          )
-          out['njets'].fill(
-              dataset=sample_group_name,
-              njets=emevents.nJet30, 
-              weight=weight
-          )
-          #out['emumass2D'].fill(
-          #    dataset=emevents.metadata["dataset"],
-          #    emumass=emu.mass, 
-          #    ept=Electron_collections.pt, 
-          #    weight=weight
-          #)
+          self.SF(emevents)
+          emevents, onejets_emevents, Multijets_emevents_GG, Multijets_emevents_VBF = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
+          emevents_0jet, emevents_1jet, emevents_2jet_GG, emevents_2jet_VBF = emevents[emevents.nJet30 == 0], onejets_emevents[onejets_emevents.nJet30 == 1], Multijets_emevents_GG, Multijets_emevents_VBF
+          pandasDF(emevents_0jet, emevents_1jet, emevents_2jet_GG, emevents_2jet_VBF)
+
+
+          out['mva'].add( processor.column_accumulator( emevents[emevents.nJet30 == 0][var].to_numpy() ) )
         else:
           print("No Events found in "+emevents.metadata["dataset"]) 
         return out
@@ -460,10 +456,16 @@ class MyEMuPeak(processor.ProcessorABC):
         return accumulator
 
 if __name__ == '__main__':
+  BDTjsons = ['model_GG_0jets', 'model_GG_1jets', 'model_GG_2jets', 'model_VBF_2jets']
+  BDTmodels = {}
+  for BDTjson in BDTjsons:
+    BDTmodels[BDTjson] = xgb.XGBClassifier()
+    BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/models/{BDTjson}.bin')
+  print(BDTmodels)
   years = ['2017']
   for year in years:
     with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)
-    processor_instance = MyEMuPeak(lumiWeight, year)
+    processor_instance = MyEMuPeak(lumiWeight, BDTmodels, year)
     outname = os.path.basename(__file__).replace('.py','')
     save(processor_instance, f'processors/{outname}_{year}.coffea')

@@ -68,7 +68,7 @@ if __name__ == '__main__':
     samples = {}
     for samples_shorthand in find_samples.samples_to_run[group]:
   #    if args.parsl:
-       samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}/{samples_shorthand}*/*/*/*/*root')
+       samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}_v1p2/{samples_shorthand}*/*/*/*/*root')
   #    else:
       #samples[samples_shorthand] = glob.glob(f'root://cmsxrootd.hep.wisc.edu//store/user/kaho/NanoPost_{args.year}/{samples_shorthand}*/*/*/*/*root')
     rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 

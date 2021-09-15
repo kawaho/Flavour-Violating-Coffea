@@ -157,7 +157,7 @@ class MyDF(processor.ProcessorABC):
 
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
-        Jet_collections = ak.pad_none(Jet_collections, 2, clip=True)
+
         #Take the first leptons
         Electron_collections = Electron_collections[:,0]
         Muon_collections = Muon_collections[:,0]
@@ -171,14 +171,14 @@ class MyDF(processor.ProcessorABC):
     
     def SF(self, emevents):
         if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
-          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==0 #numpy.ones(len(emevents))
+          SF = ak.sum(emevents.Jet.passDeepJet_M,1)==0 #numpy.ones(len(emevents))
         else:
           #Get bTag SF
-          bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
-          #bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
+          #bTagSF_L = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
+          bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
  
           #bTag/PU/Gen Weights
-          SF = bTagSF*emevents.puWeight*emevents.genWeight
+          SF = bTagSF_M*emevents.puWeight*emevents.genWeight
 
           #PU/PF/Gen Weights
           if self._year != '2018':
@@ -219,6 +219,7 @@ class MyDF(processor.ProcessorABC):
 
     def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
         #make interesting variables
+        #zero/any no. of jets
         emevents["sample"] = numpy.repeat(self._samples.index(emevents.metadata["dataset"]), len(emevents))
         emevents["njets"] = emevents.nJet30
         emVar = Electron_collections + Muon_collections
@@ -247,49 +248,63 @@ class MyDF(processor.ProcessorABC):
         emevents["pZeta"] = pZeta_
         emevents["pZetaVis"] = pZetaVis_
 
-        emevents['j1pt'] = Jet_collections[:,0].pt
-        emevents['j1Eta'] = Jet_collections[:,0].eta
+        #one jets
+        onejets_emevents = emevents[emevents.nJet30 >= 1]
+        Electron_collections_1jet = Electron_collections[emevents.nJet30 >= 1]
+        Muon_collections_1jet = Muon_collections[emevents.nJet30 >= 1]
+        emVar_1jet = Electron_collections_1jet + Muon_collections_1jet
+        Jet_collections_1jet = Jet_collections[emevents.nJet30 >= 1]
 
-        emevents["DeltaEta_j1_em"] = abs(Jet_collections[:,0].eta - emVar.eta)
-        emevents["DeltaPhi_j1_em"] = Jet_collections[:,0].delta_phi(emVar)
-        emevents["DeltaR_j1_em"] = Jet_collections[:,0].delta_r(emVar)
+        onejets_emevents['j1pt'] = Jet_collections_1jet[:,0].pt
+        onejets_emevents['j1Eta'] = Jet_collections_1jet[:,0].eta
 
-        emevents["Zeppenfeld_1"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0]])
-        emevents["Rpt_1"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0]])
+        onejets_emevents["DeltaEta_j1_em"] = abs(Jet_collections_1jet[:,0].eta - emVar_1jet.eta)
+        onejets_emevents["DeltaPhi_j1_em"] = Jet_collections_1jet[:,0].delta_phi(emVar_1jet)
+        onejets_emevents["DeltaR_j1_em"] = Jet_collections_1jet[:,0].delta_r(emVar_1jet)
 
-        emevents['j2pt'] = Jet_collections[:,1].pt
-        emevents['j2Eta'] = Jet_collections[:,1].eta
-        emevents["j1_j2_mass"] = (Jet_collections[:,0] + Jet_collections[:,1]).mass
+        onejets_emevents["Zeppenfeld_1"] = Zeppenfeld(Muon_collections_1jet, Electron_collections_1jet, [Jet_collections_1jet[:,0]])
+        onejets_emevents["Rpt_1"] = Rpt(Muon_collections_1jet, Electron_collections_1jet, [Jet_collections_1jet[:,0]])
 
-        emevents["DeltaEta_em_j1j2"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - emVar.eta)
-        emevents["DeltaPhi_em_j1j2"] = (Jet_collections[:,0] + Jet_collections[:,1]).delta_phi(emVar)
-        emevents["DeltaR_em_j1j2"] = (Jet_collections[:,0] + Jet_collections[:,1]).delta_r(emVar)
+        #2 or more jets
+        Multijets_emevents = onejets_emevents[onejets_emevents.nJet30 >= 2]
+        Electron_collections_2jet = Electron_collections_1jet[onejets_emevents.nJet30 >= 2]
+        Muon_collections_2jet = Muon_collections_1jet[onejets_emevents.nJet30 >= 2]
+        emVar_2jet = Electron_collections_2jet + Muon_collections_2jet
+        Jet_collections_2jet = Jet_collections_1jet[onejets_emevents.nJet30 >= 2]
 
-        emevents["DeltaEta_j2_em"] = abs(Jet_collections[:,1].eta - emVar.eta)
-        emevents["DeltaPhi_j2_em"] = Jet_collections[:,1].delta_phi(emVar)
-        emevents["DeltaR_j2_em"] = Jet_collections[:,1].delta_r(emVar)
+        Multijets_emevents['j2pt'] = Jet_collections_2jet[:,1].pt
+        Multijets_emevents['j2Eta'] = Jet_collections_2jet[:,1].eta
+        Multijets_emevents["j1_j2_mass"] = (Jet_collections_2jet[:,0] + Jet_collections_2jet[:,1]).mass
 
-        emevents["DeltaEta_j1_j2"] = abs(Jet_collections[:,0].eta - Jet_collections[:,1].eta)
+        Multijets_emevents["DeltaEta_em_j1j2"] = abs((Jet_collections_2jet[:,0] + Jet_collections_2jet[:,1]).eta - emVar_2jet.eta)
+        Multijets_emevents["DeltaPhi_em_j1j2"] = (Jet_collections_2jet[:,0] + Jet_collections_2jet[:,1]).delta_phi(emVar_2jet)
+        Multijets_emevents["DeltaR_em_j1j2"] = (Jet_collections_2jet[:,0] + Jet_collections_2jet[:,1]).delta_r(emVar_2jet)
 
-        emevents["isVBFcat"] = ((emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5)) 
+        Multijets_emevents["DeltaEta_j2_em"] = abs(Jet_collections_2jet[:,1].eta - emVar_2jet.eta)
+        Multijets_emevents["DeltaPhi_j2_em"] = Jet_collections_2jet[:,1].delta_phi(emVar_2jet)
+        Multijets_emevents["DeltaR_j2_em"] = Jet_collections_2jet[:,1].delta_r(emVar_2jet)
 
-        emevents["DeltaPhi_j1_j2"] = Jet_collections[:,0].delta_phi(Jet_collections[:,1])
-        emevents["DeltaR_j1_j2"] = Jet_collections[:,0].delta_r(Jet_collections[:,1])
+        Multijets_emevents["DeltaEta_j1_j2"] = abs(Jet_collections_2jet[:,0].eta - Jet_collections_2jet[:,1].eta)
 
-        emevents["Zeppenfeld"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
-        emevents["Zeppenfeld_DeltaEta"] = emevents["Zeppenfeld"]/emevents["DeltaEta_j1_j2"]
-        emevents["absZeppenfeld_DeltaEta"] = abs(emevents["Zeppenfeld_DeltaEta"])
-        emevents["cen"] = numpy.exp(-4*emevents["Zeppenfeld_DeltaEta"]**2)
+        Multijets_emevents["isVBFcat"] = ((Multijets_emevents["j1_j2_mass"] > 400) & (Multijets_emevents["DeltaEta_j1_j2"] > 2.5)) 
 
-        emevents["Rpt"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
+        Multijets_emevents["DeltaPhi_j1_j2"] = Jet_collections_2jet[:,0].delta_phi(Jet_collections_2jet[:,1])
+        Multijets_emevents["DeltaR_j1_j2"] = Jet_collections_2jet[:,0].delta_r(Jet_collections_2jet[:,1])
 
-        emevents["pt_cen"] = pt_cen(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
-        emevents["pt_cen_Deltapt"] = emevents["pt_cen"]/(Jet_collections[:,0] - Jet_collections[:,1]).pt
-        emevents["abspt_cen_Deltapt"] = abs(emevents["pt_cen_Deltapt"])
+        Multijets_emevents["Zeppenfeld"] = Zeppenfeld(Muon_collections_2jet, Electron_collections_2jet, [Jet_collections_2jet[:,0], Jet_collections_2jet[:,1]])
+        Multijets_emevents["Zeppenfeld_DeltaEta"] = Multijets_emevents["Zeppenfeld"]/Multijets_emevents["DeltaEta_j1_j2"]
+        Multijets_emevents["absZeppenfeld_DeltaEta"] = abs(Multijets_emevents["Zeppenfeld_DeltaEta"])
+        Multijets_emevents["cen"] = numpy.exp(-4*Multijets_emevents["Zeppenfeld_DeltaEta"]**2)
 
-        emevents["Ht_had"] = ak.sum(Jet_collections.pt, 1)
-        emevents["Ht"] = ak.sum(Jet_collections.pt, 1) + Muon_collections.pt + Electron_collections.pt
-        return emevents
+        Multijets_emevents["Rpt"] = Rpt(Muon_collections_2jet, Electron_collections_2jet, [Jet_collections_2jet[:,0], Jet_collections_2jet[:,1]])
+
+        Multijets_emevents["pt_cen"] = pt_cen(Muon_collections_2jet, Electron_collections_2jet, [Jet_collections_2jet[:,0], Jet_collections_2jet[:,1]])
+        Multijets_emevents["pt_cen_Deltapt"] = Multijets_emevents["pt_cen"]/(Jet_collections_2jet[:,0] - Jet_collections_2jet[:,1]).pt
+        Multijets_emevents["abspt_cen_Deltapt"] = abs(Multijets_emevents["pt_cen_Deltapt"])
+
+        Multijets_emevents["Ht_had"] = ak.sum(Jet_collections_2jet.pt, 1)
+        Multijets_emevents["Ht"] = ak.sum(Jet_collections_2jet.pt, 1) + Muon_collections_2jet.pt + Electron_collections_2jet.pt
+        return emevents, onejets_emevents, Multijets_emevents
 
     # we will receive a NanoEvents instead of a coffea DataFrame
     def process(self, events):
@@ -298,18 +313,19 @@ class MyDF(processor.ProcessorABC):
         if len(emevents)>0:
           emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
           emevents = self.SF(emevents)
-          emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
+          emevents, onejets_emevents, Multijets_emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
 
           for var in self.var_ :
               out[var+'_0jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 0][var].to_numpy() ) )
-              out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 2][var].to_numpy() ) )
+              out[var+'_1jets'].add( processor.column_accumulator( onejets_emevents[onejets_emevents.nJet30 == 1][var].to_numpy() ) )
+              out[var+'_2jets'].add( processor.column_accumulator( Multijets_emevents[var].to_numpy() ) )
+
           for var in self.var_1jet_ :
-              out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 2][var].to_numpy() ) )
+              out[var+'_1jets'].add( processor.column_accumulator( onejets_emevents[onejets_emevents.nJet30 == 1][var].to_numpy() ) )
+              out[var+'_2jets'].add( processor.column_accumulator( Multijets_emevents[var].to_numpy() ) )
 
           for var in self.var_2jet_ :
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 2][var].to_numpy() ) )
+              out[var+'_2jets'].add( processor.column_accumulator( Multijets_emevents[var].to_numpy() ) )
  
         return out
 

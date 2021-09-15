@@ -1,14 +1,14 @@
 from coffea import processor, hist
 from coffea.util import save
-#from coffea.btag_tools import BTagScaleFactor
+from coffea.btag_tools import BTagScaleFactor
 import awkward as ak
 import numpy, json, os
 
 class MyEMuPeak(processor.ProcessorABC):
-    def __init__(self, lumiWeight, year):
+    def __init__(self, lumiWeight, btag_sf, year):
         dataset_axis = hist.Cat("dataset", "samples")
         self._lumiWeight = lumiWeight
-        #self._btag_sf = btag_sf
+        self._btag_sf = btag_sf
         self._year = year
         self._accumulator = processor.dict_accumulator({
             'MET': hist.Hist(
@@ -219,11 +219,11 @@ class MyEMuPeak(processor.ProcessorABC):
 #        bTagSF_M = ak.fill_none(bTagSF_M, 0)
 #        bTagSF_M = (1-bTagSF_M[:,0])*(1-bTagSF_M[:,1])
 
-        bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
+#        bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
 #        bTagSF_M = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
-        #bJetCollections = emevents.Jet[emevents.Jet.passDeepJet_M==1]
-        #btagSF_deepjet_M = btag_sf.eval("central", bJetCollections.hadronFlavour, abs(bJetCollections.eta), bJetCollections.pt_nom)
-        #bTagSF_M = ak.prod(1-btagSF_deepjet_M, axis=1)
+        bJetCollections = emevents.Jet[emevents.Jet.passDeepJet_M==1]
+        btagSF_deepjet_M = btag_sf.eval("central", bJetCollections.hadronFlavour, abs(bJetCollections.eta), bJetCollections.pt_nom)
+        bTagSF_M = ak.prod(1-btagSF_deepjet_M, axis=1)
 
         #PU/PF/Gen Weights
         if self._year == '2018':
@@ -375,11 +375,11 @@ class MyEMuPeak(processor.ProcessorABC):
 
 if __name__ == '__main__':
   years = ['2017','2018']
-#  bTagFiles = ['bTagFiles/DeepJet_106XUL17SF_WPonly_V2p1.csv','bTagFiles/DeepJet_106XUL18SF_WPonly.csv']
-  for year in years:
+  bTagFiles = ['bTagFiles/DeepJet_106XUL17SF_WPonly_V2p1.csv','bTagFiles/DeepJet_106XUL18SF_WPonly.csv']
+  for year, bTagFile in zip(years, bTagFiles):
     with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)
-#    btag_sf = BTagScaleFactor(bTagFile, "MEDIUM")
-    processor_instance = MyEMuPeak(lumiWeight, year)
+    btag_sf = BTagScaleFactor(bTagFile, "MEDIUM")
+    processor_instance = MyEMuPeak(lumiWeight, btag_sf, year)
     outname = os.path.basename(__file__).replace('.py','')
     save(processor_instance, f'processors/{outname}_{year}.coffea')

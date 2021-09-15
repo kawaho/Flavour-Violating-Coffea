@@ -25,13 +25,10 @@ if __name__ == '__main__':
   parser.add_argument('-j', '--workers', type=int, default=200, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
   args = parser.parse_args()
 
-  executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '}#, 'config': htex}
-
   if args.parsl:
     from parsl_config import parsl_condor_config, parsl_local_config
     import parsl
     executor = processor.parsl_executor
-    parsl.set_file_logger('parsl.log', level=logging.DEBUG)
     if args.condor:
       htex = parsl_condor_config(workers=args.workers)
     else:
@@ -72,25 +69,28 @@ if __name__ == '__main__':
   rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
   processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 
   processor_instance = load(processorpath)
-#  pre_executor = processor.futures_executor #parsl_executor#(config=parsl_local_config(os.cpu_count()))
-#  pre_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Preprocessing {args.baseprocessor} {args.year} ', 'workers': os.cpu_count()} #'config': parsl_local_config(10)}#, 'workers': os.cpu_count()}
-  result = processor.run_uproot_job(
-      samples,
-      "Events",
-      processor_instance,
-      executor, 
-      executor_args,
-      chunksize=20000 
-      #pre_executor,
-      #pre_args
-  )
-  outputPath = f"./results/{args.year}/{args.baseprocessor}"
-  Path(outputPath).mkdir(parents=True, exist_ok=True)
-  if args.subfix:
-    save(result, f"{outputPath}/output_{args.subfix}.coffea")
-  else:
-    save(result, f"{outputPath}/output.coffea")
+  for s in samples:
+    executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} {s}'}#, 'config': htex}
 
+    subsamples = {}
+    subsamples[s] = samples[s]
+    result = processor.run_uproot_job(
+        subsamples,
+        "Events",
+        processor_instance,
+        executor, 
+        executor_args,
+        chunksize=700000  
+        #pre_executor,
+        #pre_args
+    )
+    outputPath = f"./results/{args.year}/{args.baseprocessor}"
+    Path(outputPath).mkdir(parents=True, exist_ok=True)
+    if args.subfix:
+      save(result, f"{outputPath}/output_{s}_{args.subfix}.coffea")
+    else:
+      save(result, f"{outputPath}/output_{s}.coffea")
+    
   if args.parsl:
     parsl.dfk().cleanup()
     parsl.clear()
