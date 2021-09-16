@@ -40,7 +40,7 @@ def collapse_ranges_in_list(xs):
 if __name__ == '__main__':
   years = ['2018']
   for year in years:
-    samples_era = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'_v1p2/SingleMuon/*')
+    samples_era = glob.glob('/hadoop/store/user/kaho/NanoPost_'+year+'_v1p3/SingleMuon/*')
     sample_paths = {}
     for name in samples_era:
        sample_basename = os.path.basename(name)

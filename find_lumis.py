@@ -90,7 +90,7 @@ if __name__ == '__main__':
   datalumis = {'2016preVFP': 36330, '2016postVFP': 36330, '2017': 41476.1, '2018': 59811.9}
   year = '2018'
   if True: #for year in datalumis:
-    samples_names = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'_v1p2/*')
+    samples_names = glob.glob('/hadoop/store/user/kaho/NanoPost_'+year+'_v1p3/*')
     sample_paths = {}
     lumiWeight = {}
     for name in samples_names:

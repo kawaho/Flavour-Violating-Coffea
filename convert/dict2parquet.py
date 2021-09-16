@@ -4,6 +4,7 @@ import pandas as pd
 import glob, os, json, argparse
 parser = argparse.ArgumentParser(description='Convert coffea output to csv files')
 parser.add_argument('-b', '--baseprocessor', type=str, default='makeDF', help='processor tag (default: %(default))')
+parser.add_argument('-o', '--output', type=str, default='parquet', help='output type (default: %(default))')
 #parser.add_argument('-y', '--year', type=str, default=None, help='analysis year')
 args = parser.parse_args()
 years = ['2018','2017']
@@ -22,5 +23,8 @@ for year in years:
           var_dict[i][varName.replace(f'_{i}jets','')] = result[varName].value
 for i in range(3):
     df = pd.DataFrame(var_dict[i])
-    df.to_parquet(f'results/csv4BDT/out_{i}jets.parquet', index=False)    
+    if args.output == 'csv':
+      df.to_csv(f'results/csv4BDT/out_{i}jets.csv', index=False)    
+    elif args.output == 'parquet':
+      df.to_parquet(f'results/csv4BDT/out_{i}jets.parquet', index=False)    
 

@@ -8,46 +8,52 @@ import find_samples
 import uproot
 uproot.open.defaults["xrootd_handler"] = uproot.source.xrootd.MultithreadedXRootDSource
 
-logging.basicConfig(filename='_run_processor.log', level=logging.DEBUG, format='%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+#logging.basicConfig(filename='_run_processor.log', level=logging.DEBUG, format='%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-rootLogger = logging.getLogger()
-logging.captureWarnings(True)
-
+#rootLogger = logging.getLogger()
+#logging.captureWarnings(True)
 
 if __name__ == '__main__':
 
   parser = argparse.ArgumentParser(description='Run coffea processors')
-  parser.add_argument('-p', '--parsl', action='store_true', help='Use parsl to distribute')
-  parser.add_argument('-c', '--condor', action='store_true', help='Run on condor')
+  parser.add_argument('-w', '--wq', action='store_true', help='Use work-queue to distribute')
   parser.add_argument('-b', '--baseprocessor', type=str, default=None, help='processor tag')
   parser.add_argument('-s', '--subfix', type=str, default=None, help='output tag')
-  parser.add_argument('-y', '--year', type=str, default=None, help='analysis year')
+  parser.add_argument('-y', '--year', type=str, default='2017', help='analysis year')
   parser.add_argument('-j', '--workers', type=int, default=200, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
   args = parser.parse_args()
 
   executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '}#, 'config': htex}
 
-  if args.parsl:
-    from parsl_config import parsl_condor_config, parsl_local_config
-    import parsl
-    executor = processor.parsl_executor
-    parsl.set_file_logger('parsl.log', level=logging.DEBUG)
-    if args.condor:
-      htex = parsl_condor_config(workers=args.workers)
-    else:
-      ncpu = int(os.cpu_count()/2)
-      print ("Number of cores: %i"%ncpu)
-      htex = parsl_local_config(workers=ncpu)
-    # keep retrying in case the parsl fails to load
-    retry_count = 0
-    while True:
-      try:
-          parsl.load(htex)
-          break
-      except:
-          retry_count += 1
-          logging.warning(f'Failed to load parsl. retry {retry_count}')
-          time.sleep(10)
+  if args.wq:
+    executor = processor.work_queue_executor
+    executor_args = {
+    "schema": NanoAODSchema, 
+    # give the manager a name so workers can automatically find it:
+    'master_name': '{}-wq-coffea'.format(os.environ['USER']),
+    # find a port to run work queue in this range (above 1024):
+    'port': [9123,9130],
+    # if not given, assume environment already setup at execution site
+    'environment_file': "remote-coffea-env.tar.gz",
+    # adjust size of resources allocated to tasks as they are measured
+    # use maximum resources seen, retry on maximum values if exhausted.
+    'resource_monitor': True,
+    'resources_mode': 'auto',
+    # print messages when tasks are submitted, and as they return, their
+    # resource allocation and usage.
+    'verbose': True,
+    # detailed debug messages
+    'debug_log': 'debug.log',
+    # lifetime of tasks, workers, and resource allocations
+    'transactions_log': 'tr.log',
+    # time series of manager statistics, plot with work_queue_graph_log
+    'stats_log': 'stats.log',
+    }
+#    # no task can use more than these maximum values:
+#    'cores': 1,
+#    'memory': 8000,
+#    'disk': 8000,
+
   else:
     executor = processor.futures_executor  
     ncpu = int(os.cpu_count()/2)
@@ -58,22 +64,23 @@ if __name__ == '__main__':
       lumiWeight = json.load(f)
 
   samples = {}
-
   for samples_shorthand in lumiWeight:
     if samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
-      samples[samples_shorthand] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}_v1p2/{samples_shorthand}*/*/*/*/*root')
+      samples[samples_shorthand] = glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/{samples_shorthand}*/*/*/*/*root')
 
   if 'data' in find_samples.samples_to_run[args.baseprocessor]:
-    samples['data'] = glob.glob(f'/hdfs/store/user/kaho/NanoPost_{args.year}_v1p2/SingleMuon/*/*/*/*root')
+    samples['data'] = glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/SingleMuon/*/*/*/*root')
 
-  #if args.parsl:
-  #  for samples_shorthand in samples: 
-  #    samples[samples_shorthand] = [i.replace('/hdfs','root://cmsxrootd.hep.wisc.edu/') for i in samples[samples_shorthand]]
-  rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
+  #tmp solution to read from wisc
+  #with open(f'data.json') as f:
+  #    all_samples = json.load(f)
+  #for samples_shorthand in lumiWeight:
+  #  if samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
+  #    samples[samples_shorthand] = all_samples[samples_shorthand]
+
+#  rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
   processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 
   processor_instance = load(processorpath)
-#  pre_executor = processor.futures_executor #parsl_executor#(config=parsl_local_config(os.cpu_count()))
-#  pre_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Preprocessing {args.baseprocessor} {args.year} ', 'workers': os.cpu_count()} #'config': parsl_local_config(10)}#, 'workers': os.cpu_count()}
   result = processor.run_uproot_job(
       samples,
       "Events",
@@ -90,7 +97,3 @@ if __name__ == '__main__':
     save(result, f"{outputPath}/output_{args.subfix}.coffea")
   else:
     save(result, f"{outputPath}/output.coffea")
-
-  if args.parsl:
-    parsl.dfk().cleanup()
-    parsl.clear()

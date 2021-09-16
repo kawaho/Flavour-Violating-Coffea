@@ -1,4 +1,5 @@
 json
+wq-*
 parsl_logs/
 *__init__*
 .__*
@@ -15,3 +16,4 @@ conda-install.sh
 *.csv
 *.coffea
 *.out
+!my-conf.json

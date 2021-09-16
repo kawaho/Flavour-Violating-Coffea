@@ -1,29 +1,23 @@
+unset PYTHONPATH
+voms-proxy-init --rfc --voms cms -valid 192:00
 while true; do
-  read -p "Which setup? (local/lcg/conda): " setup
-  
+  read -p "Which setup? (local/remote): " setup
   case $setup in
     local)
       echo "-------------Setting up $setup virtual env-------------"
-      source coffeaenv_local/bin/activate
+      conda activate  my-coffea-env
       echo "-------------          Done            -------------"
       break
       ;;
-    lcg)
+    remote)
       echo "-------------Setting up $setup virtual env-------------"
-      source coffeaenv/bin/activate
-      echo "-------------          Done            -------------"
-      voms96
-      break
-      ;;
-    conda)
-      echo "-------------Setting up $setup virtual env-------------"
-      conda activate coffeaenv_conda
+      conda activate  remote-coffea-env
       echo "-------------          Done            -------------"
       break
       ;;
     *)
       echo "-------------        Invalid setup        -------------"
-      echo "-------------    Enter local/lcg/conda    -------------"
+      echo "-------------     Enter local/remote      -------------"
       ;;
   esac
 done
