@@ -4,7 +4,7 @@ from coffea.nanoevents import NanoEventsFactory, NanoAODSchema, BaseSchema
 from pathlib import Path
 import glob, os, json, logging, argparse
 import find_samples
-
+import importlib
 import uproot
 uproot.open.defaults["xrootd_handler"] = uproot.source.xrootd.MultithreadedXRootDSource
 
@@ -39,15 +39,15 @@ if __name__ == '__main__':
     # use maximum resources seen, retry on maximum values if exhausted.
     'resource_monitor': True,
     'resources_mode': 'auto',
-    # print messages when tasks are submitted, and as they return, their
-    # resource allocation and usage.
-    'verbose': True,
-    # detailed debug messages
-    'debug_log': 'debug.log',
-    # lifetime of tasks, workers, and resource allocations
-    'transactions_log': 'tr.log',
-    # time series of manager statistics, plot with work_queue_graph_log
-    'stats_log': 'stats.log',
+  #  # print messages when tasks are submitted, and as they return, their
+  #  # resource allocation and usage.
+  #  'verbose': True,
+  #  # detailed debug messages
+  #  'debug_log': 'debug.log',
+  #  # lifetime of tasks, workers, and resource allocations
+  #  'transactions_log': 'tr.log',
+  #  # time series of manager statistics, plot with work_queue_graph_log
+  #  'stats_log': 'stats.log',
     }
 #    # no task can use more than these maximum values:
 #    'cores': 1,
@@ -79,8 +79,10 @@ if __name__ == '__main__':
   #    samples[samples_shorthand] = all_samples[samples_shorthand]
 
 #  rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
-  processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 
-  processor_instance = load(processorpath)
+#  processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 
+#  processor_instance = load(processorpath)
+  mod = importlib.import_module(f'processors.{args.baseprocessor}')
+  processor_instance = mod.MyEMuPeak(lumiWeight, args.year, *find_samples.samples_to_run[args.baseprocessor])
   result = processor.run_uproot_job(
       samples,
       "Events",
