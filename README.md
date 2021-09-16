@@ -32,7 +32,11 @@ python find_lumis.py
 # Workflow
 
 ## Coffea Processors
-Create coffea processors in the `processors` directory. 
+Create coffea processors in the `processors` directory. For example, do 
+```bash
+python processors/makeHist.py 
+```
+to generate `./processors/makeHist_{year}.coffea`
 
 ## Sample Selections
 Modify the dictionary in `find_samples.py` to tell the processors which samples you want to run over. For example, if I want to run over `GluGlu_LFV_HToEMu` with a processor named `makeHist`
