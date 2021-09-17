@@ -1,15 +1,68 @@
 from coffea import processor, hist
 from coffea.util import save
 import awkward as ak
-import numpy, json, os
-from processors.Kinematics import *
+import numpy, json, os, sys
 
-class MyEMuPeak(processor.ProcessorABC):
-    def __init__(self, lumiWeight, year, *argv):
+def pZeta(leg1, leg2, MET_px, MET_py):
+    leg1x = numpy.cos(leg1.phi)
+    leg2x = numpy.cos(leg2.phi)
+    leg1y = numpy.sin(leg1.phi)
+    leg2y = numpy.sin(leg2.phi)
+    zetaX = leg1x + leg2x
+    zetaY = leg1y + leg2y
+    zetaR = numpy.sqrt(zetaX*zetaX + zetaY*zetaY)
+    
+    zetaX = numpy.where((zetaR > 0.), zetaX/zetaR, zetaX)
+    zetaY = numpy.where((zetaR > 0.), zetaY/zetaR, zetaY)
+    
+    visPx = leg1.px + leg2.px
+    visPy = leg1.py + leg2.py
+    pZetaVis = visPx*zetaX + visPy*zetaY
+    px = visPx + MET_px
+    py = visPy + MET_py
+    
+    pZeta = px*zetaX + py*zetaY
+    
+    return (pZeta, pZetaVis)
+
+def Rpt(lep1, lep2, jets=None):
+    emVar = lep1+lep2
+    if jets==None:
+        return (emVar).pt/(lep1.pt+lep2.pt)
+    elif len(jets)==1:
+        return (emVar + jets[0]).pt/(lep1.pt+lep2.pt+jets[0].pt)
+    elif len(jets)==2:
+        return (emVar + jets[0] +jets[1]).pt/(lep1.pt+lep2.pt+jets[0].pt+jets[1].pt)
+    else:
+        return -999
+    
+def Zeppenfeld(lep1, lep2, jets):
+    emVar = lep1+lep2
+    if len(jets)==1:
+        return emVar.eta - (jets[0].eta)/2
+    elif len(jets)==2:
+        return emVar.eta - (jets[0].eta + jets[1].eta)/2
+    else:
+        return -999
+
+def mT(lep, met):
+    return numpy.sqrt(abs((numpy.sqrt(lep.mass**2+lep.pt**2) + met.pt)**2 - (lep+met).pt**2))
+
+def pt_cen(lep1, lep2, jets):
+    emVar = lep1+lep2
+    if len(jets)==1:
+        return emVar.pt - jets[0].pt/2
+    elif len(jets)==2:
+        return emVar.pt - (jets[0] + jets[1]).pt/2
+    else:
+        return -999
+
+class MyDF(processor.ProcessorABC):
+    def __init__(self, lumiWeight, year):
+        self._samples = []
         self._lumiWeight = lumiWeight
         self._year = year
         self._accumulator = processor.dict_accumulator({})
-        self._samples = argv
         self.var_ = ["is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaPhi_j1_em", "DeltaR_j1_em", "Zeppenfeld_1", "Rpt_1"]
         self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaPhi_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaPhi_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaPhi_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "absZeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "abspt_cen_Deltapt", "Ht_had", "Ht"]
@@ -22,6 +75,10 @@ class MyEMuPeak(processor.ProcessorABC):
             self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
         for var in self.var_2jet_ :
             self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
+
+    def sample_list(self, *argv):
+        self._samples = argv
+
     @property
     def accumulator(self):
         return self._accumulator
@@ -263,3 +320,15 @@ class MyEMuPeak(processor.ProcessorABC):
     def postprocess(self, accumulator):
         return accumulator
 
+
+if __name__ == '__main__':
+#  current = os.path.dirname(os.path.realpath(__file__))
+#  sys.path.append(os.path.dirname(current))
+#  import find_samples
+  years = ['2017', '2018']
+  for year in years:
+    with open('lumi_'+year+'.json') as f:
+      lumiWeight = json.load(f)
+    processor_instance = MyDF(lumiWeight, year)#, *find_samples.samples_to_run['makeDF'])
+    outname = os.path.basename(__file__).replace('.py','')
+    save(processor_instance, f'processors/{outname}_{year}.coffea')
