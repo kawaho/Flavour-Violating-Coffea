@@ -1,8 +1,22 @@
 from coffea import processor, hist
 from coffea.util import save
-from coffea.lookup_tools import extractor
 import awkward as ak
-import numpy, json, os, sys
+import numba, numpy, json, os, sys
+
+@numba.njit
+def bTagSF_fast(bTagSF, btagSF_deepjet, nbtag):
+    for i in range(len(nbtag)):
+        if (nbtag[i]) >= 2:
+            acc_hi=0
+            for j in range(len(btagSF_deepjet[i])):
+                acc=btagSF_deepjet[i][j]
+                for k in range(j+1, len(btagSF_deepjet[i])):
+                    acc*=btagSF_deepjet[i][k]
+                    for z in range(len(btagSF_deepjet[i])):
+                        if z!=j and z!=k:
+                            acc*=(1-btagSF_deepjet[i][z])
+                acc_hi+=acc
+        bTagSF[i]=acc_hi
 
 def pZeta(leg1, leg2, MET_px, MET_py):
     leg1x = numpy.cos(leg1.phi)
@@ -80,6 +94,7 @@ class MyDF(processor.ProcessorABC):
     def sample_list(self, *argv):
         self._samples = argv
 
+
     @property
     def accumulator(self):
         return self._accumulator
@@ -115,12 +130,8 @@ class MyDF(processor.ProcessorABC):
         E_charge = ak.fill_none(ak.pad_none(E_collections.charge, 1, axis=-1), 0, axis=-1)
         M_charge = ak.fill_none(ak.pad_none(M_collections.charge, 1, axis=-1), 0, axis=-1)
         opp_charge = ak.flatten(E_charge*M_charge==-1)
-        emevents = emevents[opp_charge]
-        #TODO
-        same_charge = ak.flatten(E_charge*M_charge==1)
 
-        emevents['opp_charge'] = opp_charge
-        emevents = emevents[opp_charge | same_charge]
+        emevents = emevents[opp_charge]
 
         #Trig Matching
         M_collections = emevents.Muon
@@ -172,20 +183,19 @@ class MyDF(processor.ProcessorABC):
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
 
-        if emevents.metadata["dataset"] == 'SingleMuon' or emevents.metadata["dataset"] == 'data':
-            massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
-        else:
-            massRange = (emVar.mass<160) & (emVar.mass>110)
+        massRange = (emVar.mass<160) & (emVar.mass>110)
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def SF(self, emevents):
         if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
-          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==0 #numpy.ones(len(emevents))
+          SF = ak.sum(emevents.Jet.passDeepJet_M,1)==2 #numpy.ones(len(emevents))
         else:
           #Get bTag SF
-          bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
-          #bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
- 
+          nbtag = ak.sum(emevents.Jet.passDeepJet_M,1)
+          bTagSF = numpy.zeros(len(nbtag))
+          btagSF_deepjet_M = emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M
+          bTagSF_fast(bTagSF, btagSF_deepjet_M, nbtag)
+
           #bTag/PU/Gen Weights
           SF = bTagSF*emevents.puWeight*emevents.genWeight
 
@@ -204,38 +214,7 @@ class MyDF(processor.ProcessorABC):
   
           SF = SF.to_numpy()
           SF[abs(SF)>10] = 0
-#TODO
-          #osss factor for QCD
-          emevents["njets"] = emevents.nJet30
-          emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
-          mpt = ak.mask(Muon_collections['pt'], emevents['opp_charge']==1)
-          ept = ak.mask(Electron_collections['pt'], emevents['opp_charge']==1)
-          dr = ak.mask(emevents["DeltaR_e_m"], emevents['opp_charge']==1)
-          njets = ak.mask(emevents["njets"], emevents['opp_charge']==1)
-
-#          mpt = ak.mask(Muon_collections['pt'], emevents['opp_charge']==1)
-#          ept = Electron_collections[emevents['opp_charge']==1]['pt']
-#          dr = emevents[emevents['opp_charge']==1]["DeltaR_e_m"]
-#          njets = emevents[emevents['opp_charge']==1]["njets"]
-
-          if '2016' in self._year:
-            QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr em_qcd_osss_2016.root"]
-            QCDexp="((njets==0)*(2.852125+-0.282871*dr)+(njets==1)*(2.792455+-0.295163*dr)+(njets>=2)*(2.577038+-0.290886*dr))*ss_corr*os_corr"
-          elif '2017' in self._year:
-            QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr em_qcd_osss_2017.root"]
-            QCDexp="((njets==0)*(3.221108+-0.374644*dr)+(njets==1)*(2.818298+-0.287438*dr)+(njets>=2)*(2.944477+-0.342411*dr))*ss_corr*os_corr"
-          elif '2018' in self._year:
-            QCDhist=["hist_em_qcd_osss_ss_corr em_qcd_osss_closureOS em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr em_qcd_osss_closureOS em_qcd_osss_2018.root"]
-            QCDexp="((njets==0)*(2.042-0.05889**dr)+(njets==1)*(2.827-0.2907*dr)+(njets>=2)*(2.9-0.3641*dr))*ss_corr*os_corr"
-
-          ext = extractor()
-          ext.add_weight_sets(QCDhist)
-          ext.finalize()
-          evaluator = ext.make_evaluator()
-          ss_corr, os_corr = evaluator["hist_em_qcd_osss_ss_corr"](mpt, ept), evaluator["hist_em_qcd_osss_os_corr"](mpt, ept)
-          osss = ak.numexpr.evaluate(QCDexp) 
-          emevents["osss"] = osss
-
+          
         emevents["weight"] = SF
 
         emevents["is2016preVFP"] = numpy.ones(len(emevents)) if self._year == '2016preVFP' else numpy.zeros(len(emevents))
@@ -358,7 +337,7 @@ class MyDF(processor.ProcessorABC):
 
 
 if __name__ == '__main__':
-  current = os.path.dirname(os.path.realpath(__file__))
+#  current = os.path.dirname(os.path.realpath(__file__))
 #  sys.path.append(os.path.dirname(current))
 #  import find_samples
   years = ['2017', '2018']

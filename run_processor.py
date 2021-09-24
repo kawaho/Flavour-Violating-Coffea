@@ -41,6 +41,7 @@ if __name__ == '__main__':
     # use maximum resources seen, retry on maximum values if exhausted.
     'resource_monitor': True,
     'resources_mode': 'auto',
+#    'extra_input_files': ['em_qcd_osss_2016.root', 'em_qcd_osss_2017.root', 'em_qcd_osss_2018.root'],
   #  # print messages when tasks are submitted, and as they return, their
   #  # resource allocation and usage.
   #  'verbose': True,
