@@ -5,6 +5,7 @@ parsl_logs/
 .__*
 results/
 conda-install.sh
+*.png
 *.swp
 *.pyc
 *.root
