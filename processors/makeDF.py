@@ -64,7 +64,7 @@ class MyDF(processor.ProcessorABC):
         self._lumiWeight = lumiWeight
         self._year = year
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaPhi_j1_em", "DeltaR_j1_em", "Zeppenfeld_1", "Rpt_1"]
         self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaPhi_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaPhi_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaPhi_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "absZeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "abspt_cen_Deltapt", "Ht_had", "Ht"]
         for var in self.var_ :
@@ -115,8 +115,6 @@ class MyDF(processor.ProcessorABC):
         E_charge = ak.fill_none(ak.pad_none(E_collections.charge, 1, axis=-1), 0, axis=-1)
         M_charge = ak.fill_none(ak.pad_none(M_collections.charge, 1, axis=-1), 0, axis=-1)
         opp_charge = ak.flatten(E_charge*M_charge==-1)
-        emevents = emevents[opp_charge]
-        #TODO
         same_charge = ak.flatten(E_charge*M_charge==1)
 
         emevents['opp_charge'] = opp_charge
@@ -166,6 +164,7 @@ class MyDF(processor.ProcessorABC):
 
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
+        #padding to have at least "2 jets"
         Jet_collections = ak.pad_none(Jet_collections, 2, clip=True)
         #Take the first leptons
         Electron_collections = Electron_collections[:,0]
@@ -179,11 +178,15 @@ class MyDF(processor.ProcessorABC):
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def SF(self, emevents):
+        passDeepJet30 = (emevents.Jet.pt_nom > 30) & emevents.Jet.passDeepJet_L
+        Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
+        Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
+          
         if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
-          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==0 #numpy.ones(len(emevents))
+          SF = ak.sum(passDeepJet30,1)==0 #numpy.ones(len(emevents))
         else:
           #Get bTag SF
-          bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
+          bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_L*passDeepJet30, axis=1)
           #bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
  
           #bTag/PU/Gen Weights
@@ -192,10 +195,10 @@ class MyDF(processor.ProcessorABC):
           #PU/PF/Gen Weights
           if self._year != '2018':
             SF = SF*emevents.PrefireWeight
+          #Zvtx
+          if self._year == '2017':
+            SF = 0.991*SF
   
-          Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
-          Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
-          
           #Muon SF
           SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF
   
@@ -204,40 +207,33 @@ class MyDF(processor.ProcessorABC):
   
           SF = SF.to_numpy()
           SF[abs(SF)>10] = 0
-#TODO
-          #osss factor for QCD
-          emevents["njets"] = emevents.nJet30
-          emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
-          mpt = ak.mask(Muon_collections['pt'], emevents['opp_charge']==1)
-          ept = ak.mask(Electron_collections['pt'], emevents['opp_charge']==1)
-          dr = ak.mask(emevents["DeltaR_e_m"], emevents['opp_charge']==1)
-          njets = ak.mask(emevents["njets"], emevents['opp_charge']==1)
 
-#          mpt = ak.mask(Muon_collections['pt'], emevents['opp_charge']==1)
-#          ept = Electron_collections[emevents['opp_charge']==1]['pt']
-#          dr = emevents[emevents['opp_charge']==1]["DeltaR_e_m"]
-#          njets = emevents[emevents['opp_charge']==1]["njets"]
+        #osss factor for QCD
+        emevents["njets"] = emevents.nJet30
+        emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
+        mpt = ak.mask(Muon_collections['pt'], emevents['opp_charge']!=1)
+        ept = ak.mask(Electron_collections['pt'], emevents['opp_charge']!=1)
+        dr = ak.mask(emevents["DeltaR_e_m"], emevents['opp_charge']!=1)
+        njets = ak.mask(emevents["njets"], emevents['opp_charge']!=1)
 
-          if '2016' in self._year:
-            QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr em_qcd_osss_2016.root"]
-            QCDexp="((njets==0)*(2.852125+-0.282871*dr)+(njets==1)*(2.792455+-0.295163*dr)+(njets>=2)*(2.577038+-0.290886*dr))*ss_corr*os_corr"
-          elif '2017' in self._year:
-            QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr em_qcd_osss_2017.root"]
-            QCDexp="((njets==0)*(3.221108+-0.374644*dr)+(njets==1)*(2.818298+-0.287438*dr)+(njets>=2)*(2.944477+-0.342411*dr))*ss_corr*os_corr"
-          elif '2018' in self._year:
-            QCDhist=["hist_em_qcd_osss_ss_corr em_qcd_osss_closureOS em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr em_qcd_osss_closureOS em_qcd_osss_2018.root"]
-            QCDexp="((njets==0)*(2.042-0.05889**dr)+(njets==1)*(2.827-0.2907*dr)+(njets>=2)*(2.9-0.3641*dr))*ss_corr*os_corr"
+        if '2016' in self._year:
+          QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr em_qcd_osss_2016.root"]
+          QCDexp="((njets==0)*(2.852125+-0.282871*dr)+(njets==1)*(2.792455+-0.295163*dr)+(njets>=2)*(2.577038+-0.290886*dr))*ss_corr*os_corr"
+        elif '2017' in self._year:
+          QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr em_qcd_osss_2017.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr em_qcd_osss_2017.root"]
+          QCDexp="((njets==0)*(3.221108+-0.374644*dr)+(njets==1)*(2.818298+-0.287438*dr)+(njets>=2)*(2.944477+-0.342411*dr))*ss_corr*os_corr"
+        elif '2018' in self._year:
+          QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_closureOS em_qcd_osss_2018.root", "hist_em_qcd_osss_os_corr hist_em_qcd_extrap_uncert em_qcd_osss_2018.root"]
+          QCDexp="((njets==0)*(2.042-0.05889**dr)+(njets==1)*(2.827-0.2907*dr)+(njets>=2)*(2.9-0.3641*dr))*ss_corr*os_corr"
 
-          ext = extractor()
-          ext.add_weight_sets(QCDhist)
-          ext.finalize()
-          evaluator = ext.make_evaluator()
-          ss_corr, os_corr = evaluator["hist_em_qcd_osss_ss_corr"](mpt, ept), evaluator["hist_em_qcd_osss_os_corr"](mpt, ept)
-          osss = ak.numexpr.evaluate(QCDexp) 
-          emevents["osss"] = osss
+        ext = extractor()
+        ext.add_weight_sets(QCDhist)
+        ext.finalize()
+        evaluator = ext.make_evaluator()
+        ss_corr, os_corr = evaluator["hist_em_qcd_osss_ss_corr"](mpt, ept), evaluator["hist_em_qcd_osss_os_corr"](mpt, ept)
+        osss = ak.numexpr.evaluate(QCDexp) 
 
-        emevents["weight"] = SF
-
+        emevents["weight"] = SF*ak.fill_none(osss, 1, axis=-1)
         emevents["is2016preVFP"] = numpy.ones(len(emevents)) if self._year == '2016preVFP' else numpy.zeros(len(emevents))
         emevents["is2016postVFP"] = numpy.ones(len(emevents)) if self._year == '2016postVFP' else numpy.zeros(len(emevents))
         emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))

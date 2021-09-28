@@ -1,6 +1,6 @@
 {
 "manager-name": "kho2-wq-coffea",
-"max-workers": 200,
+"max-workers": 40,
 "min-workers": 1,
 "workers-per-cycle": 20,
 "cores": 4,

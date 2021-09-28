@@ -4,8 +4,8 @@ for yr in ['2016', '2017', '2018']:
   QCDFile = r.TFile(f"QCD/htt_scalefactors_legacy_{yr}.root")
   w = QCDFile.Get("w")
   if yr=='2018':
-    hss = w.obj("em_qcd_osss_closureOS")
-    hos = w.obj("em_qcd_extrap_uncert")
+    hss = w.obj("hist_em_qcd_osss_closureOS")
+    hos = w.obj("hist_em_qcd_extrap_uncert")
   else:
     hss = w.obj("hist_em_qcd_osss_ss_corr")
     hos = w.obj("hist_em_qcd_osss_os_corr")

@@ -41,16 +41,16 @@ if __name__ == '__main__':
     # use maximum resources seen, retry on maximum values if exhausted.
     'resource_monitor': True,
     'resources_mode': 'auto',
-#    'extra_input_files': ['em_qcd_osss_2016.root', 'em_qcd_osss_2017.root', 'em_qcd_osss_2018.root'],
+    'extra_input_files': ['em_qcd_osss_2016.root', 'em_qcd_osss_2017.root', 'em_qcd_osss_2018.root'],
   #  # print messages when tasks are submitted, and as they return, their
   #  # resource allocation and usage.
-  #  'verbose': True,
-  #  # detailed debug messages
-  #  'debug_log': 'debug.log',
-  #  # lifetime of tasks, workers, and resource allocations
-  #  'transactions_log': 'tr.log',
-  #  # time series of manager statistics, plot with work_queue_graph_log
-  #  'stats_log': 'stats.log',
+    'verbose': True,
+    # detailed debug messages
+    'debug_log': 'debug.log',
+    # lifetime of tasks, workers, and resource allocations
+    'transactions_log': 'tr.log',
+    # time series of manager statistics, plot with work_queue_graph_log
+    'stats_log': 'stats.log',
     }
 #    # no task can use more than these maximum values:
 #    'cores': 1,
@@ -75,11 +75,11 @@ if __name__ == '__main__':
 
   for samples_shorthand in lumiWeight:
     if samples_shorthand in samples_to_run:
-      samples[samples_shorthand] = glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/{samples_shorthand}*/*/*/*/*root')
+      samples[samples_shorthand] = [i.replace("/hadoop", "root://deepthought.crc.nd.edu/") for i in glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/{samples_shorthand}*/*/*/*/*root')]
+      #samples[samples_shorthand] = glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/{samples_shorthand}*/*/*/*/*root')
 
   if 'data' in samples_to_run:
-    samples['data'] = glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/SingleMuon/*/*/*/*root')
-
+    samples['data'] = [i.replace("/hadoop", "root://deepthought.crc.nd.edu/") for i in glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/SingleMuon/*/*/*/*root')]
   #tmp solution to read from wisc
   #with open(f'data.json') as f:
   #    all_samples = json.load(f)
