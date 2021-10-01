@@ -90,7 +90,8 @@ if __name__ == '__main__':
 #  rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
   processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 
   processor_instance = load(processorpath)
-  processor_instance.sample_list(*find_samples.samples_to_run[args.baseprocessor])
+  if 'DF' in args.baseprocessor:
+    processor_instance.sample_list(*find_samples.samples_to_run[args.baseprocessor])
   result = processor.run_uproot_job(
       samples,
       "Events",

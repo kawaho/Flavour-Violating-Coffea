@@ -184,7 +184,7 @@ class MyDF(processor.ProcessorABC):
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def SF(self, emevents):
-        passDeepJet30 = (emevents.Jet.passJet30ID) & emevents.Jet.passDeepJet_L
+        passDeepJet30 = (emevents.Jet.passJet30ID) & emevents.Jet.passDeepJet_T
         Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
         Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
           
@@ -194,7 +194,7 @@ class MyDF(processor.ProcessorABC):
           #Get bTag SF
           nbtag = ak.sum(passDeepJet30,-1)
           bTagSF = numpy.zeros(len(nbtag))
-          btagSF_deepjet_ = emevents.Jet.btagSF_deepjet_L*passDeepJet30
+          btagSF_deepjet_ = emevents.Jet.btagSF_deepjet_T*passDeepJet30
           btagSF_deepjet_=btagSF_deepjet_[btagSF_deepjet_!=0]
           bTagSF_fast(bTagSF, btagSF_deepjet_, nbtag)
           #bTag/PU/Gen Weights
