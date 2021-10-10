@@ -71,8 +71,7 @@ class MyEMuPeak(processor.ProcessorABC):
         self.jetyearUnc = sum([[f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}', f'UnclusteredEn_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
         self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
         self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017']
-        self.theoUnc = ['scalep5p5', 'scale22']
-        #self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
+        self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
         self.leptonUnc = ['me']#['ees', 'eer', 'me']
         self._accumulator = processor.dict_accumulator({})
         for cat in ['GG0', 'GG1', 'GG2', 'VBF2']:
@@ -85,7 +84,6 @@ class MyEMuPeak(processor.ProcessorABC):
               self._accumulator[f'mva_{sys}_Down_{cat}'] = processor.column_accumulator(numpy.array([]))
           for sys in self.theoUnc:
               self._accumulator[f'weight_{sys}_{cat}'] = processor.column_accumulator(numpy.array([]))
-          self._accumulator[f'weight_lhe_{cat}'] = processor.column_accumulator(numpy.empty([0, 103]))
           for sys in self.sfUnc:
               self._accumulator[f'weight_{sys}_Up_{cat}'] = processor.column_accumulator(numpy.array([]))
               self._accumulator[f'weight_{sys}_Down_{cat}'] = processor.column_accumulator(numpy.array([]))
@@ -226,8 +224,8 @@ class MyEMuPeak(processor.ProcessorABC):
           emevents[f"weight_pf_{other_year}_Down"] = SF
 
 	#bTag Up/Down
-        bTagSF_Down = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.btagSF_deepjet_L_down, axis=1)
-        bTagSF_Up = ak.prod(1-emevents.Jet.btagSF_deepjet_L*emevents.Jet.btagSF_deepjet_L_up, axis=1)
+        bTagSF_Down = ak.prod(1-emevents.Jet.btagSF_deepjet_L_down*passDeepJet30, axis=1)
+        bTagSF_Up = ak.prod(1-emevents.Jet.btagSF_deepjet_L_up*passDeepJet30, axis=1)
         emevents[f"weight_bTag_{self._year}_Up"] = SF*bTagSF_Up/bTagSF
         emevents[f"weight_bTag_{self._year}_Down"] = SF*bTagSF_Down/bTagSF
 
@@ -247,7 +245,9 @@ class MyEMuPeak(processor.ProcessorABC):
 	#PDF and alpha_s
 	#https://lhapdfsets.web.cern.ch/current/NNPDF31_nnlo_as_0118_mc_hessian_pdfas/NNPDF31_nnlo_as_0118_mc_hessian_pdfas.info
 	#SF_theory[0] ... etc
-        emevents[f"weight_lhe"] = numpy.einsum("ij,i->ij", emevents.LHEPdfWeight.to_numpy(), SF) 
+        weight_lhe = numpy.einsum("ij,i->ij", emevents.LHEPdfWeight.to_numpy(), SF)
+        for i in range(103):
+          emevents[f"weight_lhe{i}"] = weight_lhe[:,i] 
         return emevents 
 
     def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):

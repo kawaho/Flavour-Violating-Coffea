@@ -19,6 +19,7 @@ if __name__ == '__main__':
   parser.add_argument('-w', '--wq', action='store_true', help='Use work-queue to distribute')
   parser.add_argument('-t', '--test', action='store_true', help='Run on GG_LFV_125 for testing')
   parser.add_argument('-b', '--baseprocessor', type=str, default=None, help='processor tag')
+  parser.add_argument('-r', '--remote', action='store_true', help='reading from remote sites')
   parser.add_argument('-s', '--subfix', type=str, default=None, help='output tag')
   parser.add_argument('-y', '--year', type=str, default='2017', help='analysis year')
   parser.add_argument('-j', '--workers', type=int, default=200, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
@@ -29,10 +30,11 @@ if __name__ == '__main__':
 
   if args.wq:
     executor = processor.work_queue_executor
+    #print(f"Please submit: condor_submit_workers --cores 8 --memory 8000 --disk 4000 -M "+'{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year+" 25")
     executor_args = {
     "schema": NanoAODSchema, 
     # give the manager a name so workers can automatically find it:
-    'master_name': '{}-wq-coffea'.format(os.environ['USER']),
+    'master_name': '{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year,
     # find a port to run work queue in this range (above 1024):
     'port': [9123,9130],
     # if not given, assume environment already setup at execution site
@@ -41,21 +43,22 @@ if __name__ == '__main__':
     # use maximum resources seen, retry on maximum values if exhausted.
     'resource_monitor': True,
     'resources_mode': 'auto',
-    'extra_input_files': ['em_qcd_osss_2016.root', 'em_qcd_osss_2017.root', 'em_qcd_osss_2018.root'],
+    #'extra_input_files': ['em_qcd_osss_2016.root', 'em_qcd_osss_2017.root', 'em_qcd_osss_2018.root'],
   #  # print messages when tasks are submitted, and as they return, their
   #  # resource allocation and usage.
-    'verbose': True,
+    #'verbose': True,
     # detailed debug messages
-    'debug_log': 'debug.log',
+    #'debug_log': 'debug.log',
     # lifetime of tasks, workers, and resource allocations
-    'transactions_log': 'tr.log',
+    #'transactions_log': 'tr.log',
     # time series of manager statistics, plot with work_queue_graph_log
-    'stats_log': 'stats.log',
+    #'stats_log': 'stats.log',
     }
 #    # no task can use more than these maximum values:
 #    'cores': 1,
 #    'memory': 8000,
 #    'disk': 8000,
+    os.system("condor_submit_workers --cores 8 --memory 8000 --disk 4000 -M "+'{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year+" 25")
 
   else:
     executor = processor.futures_executor  
@@ -73,19 +76,20 @@ if __name__ == '__main__':
   else:
     samples_to_run = find_samples.samples_to_run[args.baseprocessor]
 
-  for samples_shorthand in lumiWeight:
-    if samples_shorthand in samples_to_run:
-      samples[samples_shorthand] = [i.replace("/hadoop", "root://deepthought.crc.nd.edu/") for i in glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/{samples_shorthand}*/*/*/*/*root')]
-      #samples[samples_shorthand] = glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/{samples_shorthand}*/*/*/*/*root')
+  if args.remote:
+    #read from wisc
+    with open(f'samples_{args.year}.json') as f:
+        all_samples = json.load(f)
+    for samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
+        samples[samples_shorthand] = all_samples[samples_shorthand]
+  else:
+    for samples_shorthand in lumiWeight:
+      if samples_shorthand in samples_to_run:
+        samples[samples_shorthand] = [i.replace("/hadoop", "root://deepthought.crc.nd.edu/") for i in glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/{samples_shorthand}*/*/*/*/*root')]
+        #samples[samples_shorthand] = glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/{samples_shorthand}*/*/*/*/*root')
 
-  if 'data' in samples_to_run:
-    samples['data'] = [i.replace("/hadoop", "root://deepthought.crc.nd.edu/") for i in glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/SingleMuon/*/*/*/*root')]
-  #tmp solution to read from wisc
-  #with open(f'data.json') as f:
-  #    all_samples = json.load(f)
-  #for samples_shorthand in lumiWeight:
-  #  if samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
-  #    samples[samples_shorthand] = all_samples[samples_shorthand]
+    if 'data' in samples_to_run:
+      samples['data'] = [i.replace("/hadoop", "root://deepthought.crc.nd.edu/") for i in glob.glob(f'/hadoop/store/user/kaho/NanoPost_{args.year}_v1p3/SingleMuon/*/*/*/*root')]
 
 #  rootLogger.info('Will process: '+' '.join(list(samples.keys()))) 
   processorpath = f'processors/{args.baseprocessor}_{args.year}.coffea' 

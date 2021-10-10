@@ -91,20 +91,20 @@ if __name__ == '__main__':
   year = '2018'
   if True: #for year in datalumis:
     samples_names = glob.glob('/hadoop/store/user/kaho/NanoPost_'+year+'_v1p3/*')
-    print(samples_names)
     sample_paths = {}
     lumiWeight = {}
     for name in samples_names:
+       print(f"Running sample {name}")
        if 'SingleMuon' in name or 'tmp' in name: continue
        sample_basename = os.path.basename(name)
-       sample_paths[sample_basename] = glob.glob(name+'/*/*/*/*root')
+       sample_paths[sample_basename] = glob.glob(name+'/*/*/*/*.root')
        lumiWeight[mclumi(sample_basename)[0]] = 0
        runTrees = [i+':Runs' for i in sample_paths[sample_basename]]
-       for runTree in uproot.iterate(runTrees, ['genEventSumw'], num_workers=10):
+       for runTree in uproot.iterate(runTrees, ['genEventSumw'], num_workers=1):
          lumiWeight[mclumi(sample_basename)[0]]+=sum(runTree['genEventSumw']) 
-  
     for sample_basename in lumiWeight:
-      if ('DY' in sample_basename and not '10to50' in sample_basename) or (re.match(re.compile('W.Jet'), sample_basename)): 
+      if ('DY' in sample_basename and not '10to50' in sample_basename) or (re.match(re.compile('W.Jet'), sample_basename)) or "WJetsToLNu_TuneCP5" in sample_basename: 
+        print(f"{sample_basename} is DYMll50 or W+Jets")
         lumiWeight[sample_basename] = lumiWeight[sample_basename]/(mclumi(sample_basename)[1])
         if sample_basename=="DYJetsToLL_M-50":
           dyLumi = lumiWeight[sample_basename]
@@ -124,6 +124,6 @@ if __name__ == '__main__':
       elif re.match(re.compile('W.Jet'), sample_basename): 
         lumiWeight[sample_basename] = WNNLO*datalumis[year]/(lumiWeight[sample_basename]+wLumi) 
 
-    with open('lumi_'+year+'.json', 'w') as f: 
-      json.dump(lumiWeight, f, indent=4)
-      f.close()
+#    with open('lumi_'+year+'.json', 'w') as f: 
+#      json.dump(lumiWeight, f, indent=4)
+#      f.close()

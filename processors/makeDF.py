@@ -1,6 +1,7 @@
 from coffea import processor, hist
 from coffea.util import save
 from coffea.lookup_tools import extractor
+from coffea.btag_tools import BTagScaleFactor
 import awkward as ak
 import numpy, json, os, sys
 
@@ -150,17 +151,17 @@ class MyDF(processor.ProcessorABC):
             MET_collections['phi'] = MET_collections['T1_phi'] 
             MET_collections['pt'] = MET_collections['T1_pt'] 
 
-        #MET corrections Electron
-        Electron_collections['pt'] = Electron_collections['pt']/Electron_collections['eCorr']
-        MET_collections = MET_collections+Electron_collections[:,0]
-        Electron_collections['pt'] = Electron_collections['pt']*Electron_collections['eCorr']
-        MET_collections = MET_collections-Electron_collections[:,0]
+        ##MET corrections Electron
+        #Electron_collections['pt'] = Electron_collections['pt']/Electron_collections['eCorr']
+        #MET_collections = MET_collections+Electron_collections[:,0]
+        #Electron_collections['pt'] = Electron_collections['pt']*Electron_collections['eCorr']
+        #MET_collections = MET_collections-Electron_collections[:,0]
         
         #Muon pT corrections
-        MET_collections = MET_collections+Muon_collections[:,0]
+        #MET_collections = MET_collections+Muon_collections[:,0]
         Muon_collections['mass'] = Muon_collections['mass']*Muon_collections['corrected_pt']/Muon_collections['pt']
         Muon_collections['pt'] = Muon_collections['corrected_pt']
-        MET_collections = MET_collections-Muon_collections[:,0]
+        #MET_collections = MET_collections-Muon_collections[:,0]
 
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
@@ -178,16 +179,15 @@ class MyDF(processor.ProcessorABC):
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def SF(self, emevents):
-        passDeepJet30 = (emevents.Jet.pt_nom > 30) & emevents.Jet.passDeepJet_L
         Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
         Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
           
         if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
-          SF = ak.sum(passDeepJet30,1)==0 #numpy.ones(len(emevents))
+          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==0 #numpy.ones(len(emevents))
         else:
           #Get bTag SF
-          bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_L*passDeepJet30, axis=1)
-          #bTagSF = ak.prod(1-emevents.Jet.btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
+          btagSF_deepjet_L = self._btag_sf.eval("central", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
+          bTagSF = ak.prod(1-btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
  
           #bTag/PU/Gen Weights
           SF = bTagSF*emevents.puWeight*emevents.genWeight
@@ -201,7 +201,7 @@ class MyDF(processor.ProcessorABC):
             SF = 0.991*SF
   
           #Muon SF
-          SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF
+          SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*self._evaluator['trackerMu'](abs(Muon_collections.eta), Muon_collections.pt)
   
           #Electron SF and lumi
           SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF*self._lumiWeight[emevents.metadata["dataset"]]
@@ -218,20 +218,13 @@ class MyDF(processor.ProcessorABC):
         njets = ak.mask(emevents["njets"], emevents['opp_charge']!=1)
 
         if '2016' in self._year:
-          QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr em_qcd_osss_2016.root"]
           QCDexp="((njets==0)*(2.852125+-0.282871*dr)+(njets==1)*(2.792455+-0.295163*dr)+(njets>=2)*(2.577038+-0.290886*dr))*ss_corr*os_corr"
         elif '2017' in self._year:
-          QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr em_qcd_osss_2017.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr em_qcd_osss_2017.root"]
           QCDexp="((njets==0)*(3.221108+-0.374644*dr)+(njets==1)*(2.818298+-0.287438*dr)+(njets>=2)*(2.944477+-0.342411*dr))*ss_corr*os_corr"
         elif '2018' in self._year:
-          QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_closureOS em_qcd_osss_2018.root", "hist_em_qcd_osss_os_corr hist_em_qcd_extrap_uncert em_qcd_osss_2018.root"]
           QCDexp="((njets==0)*(2.042-0.05889**dr)+(njets==1)*(2.827-0.2907*dr)+(njets>=2)*(2.9-0.3641*dr))*ss_corr*os_corr"
 
-        ext = extractor()
-        ext.add_weight_sets(QCDhist)
-        ext.finalize()
-        evaluator = ext.make_evaluator()
-        ss_corr, os_corr = evaluator["hist_em_qcd_osss_ss_corr"](mpt, ept), evaluator["hist_em_qcd_osss_os_corr"](mpt, ept)
+        ss_corr, os_corr = self._evaluator["hist_em_qcd_osss_ss_corr"](mpt, ept), self._evaluator["hist_em_qcd_osss_os_corr"](mpt, ept)
         osss = ak.numexpr.evaluate(QCDexp) 
 
         emevents["weight"] = SF*ak.fill_none(osss, 1, axis=-1)
@@ -364,6 +357,28 @@ if __name__ == '__main__':
   for year in years:
     with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)
-    processor_instance = MyDF(lumiWeight, year)#, *find_samples.samples_to_run['makeDF'])
+    if '2016' in year:
+      QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2016.root"]
+      if 'pre' in year:
+        TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016preVFP_UL_trackerMuon.json"]
+      else:
+        TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016postVFP_UL_trackerMuon.json"]
+         
+    elif '2017' in year:
+      QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2017.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2017.root"]
+      TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2017_UL_trackerMuon.json"]
+      btag_sf = BTagScaleFactor("Corrections/bTag/DeepCSV_106XUL17SF_WPonly_V2p1.csv", "LOOSE")
+    elif '2018' in year:
+      QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_closureOS Corrections/QCD/em_qcd_osss_2018.root", "hist_em_qcd_osss_os_corr hist_em_qcd_extrap_uncert Corrections/QCD/em_qcd_osss_2018.root"]
+      TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2018_UL_trackerMuon.json"]
+      btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL18SF_WPonly_V1p1.csv", "LOOSE")
+
+    ext = extractor()
+    ext.add_weight_sets(QCDhist)
+    ext.add_weight_sets(TrackerMu)
+    ext.finalize()
+    evaluator = ext.make_evaluator()
+
+    processor_instance = MyDF(lumiWeight, year, btag_sf, evaluator)#, *find_samples.samples_to_run['makeDF'])
     outname = os.path.basename(__file__).replace('.py','')
     save(processor_instance, f'processors/{outname}_{year}.coffea')
