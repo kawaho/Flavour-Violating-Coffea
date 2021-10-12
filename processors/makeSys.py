@@ -67,8 +67,8 @@ class MyEMuPeak(processor.ProcessorABC):
         self.var_1jet_ = self.var_0jet_ #['e_met_mT_Per_e_m_Mass', 'm_met_mT_Per_e_m_Mass', 'mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaR_e_m', 'emEta', 'j1pt', 'DeltaR_j1_em', 'j1Eta']
         self.var_2jet_GG_ = self.var_0jet_ #['mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaR_e_m', 'emEta', 'j1pt', 'j1Eta', 'Rpt', 'j2pt', 'j2Eta', 'DeltaEta_j1_j2', 'pt_cen_Deltapt', 'j1_j2_mass', 'DeltaR_em_j1j2', 'Zeppenfeld_DeltaEta', 'DeltaPhi_j1_j2', 'DeltaR_j1_j2']
         self.var_2jet_VBF_ = self.var_0jet_ #['mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaR_e_m', 'emEta', 'j1pt', 'j1Eta', 'Rpt', 'j2pt', 'j2Eta', 'DeltaEta_j1_j2', 'pt_cen_Deltapt', 'j1_j2_mass', 'DeltaR_em_j1j2', 'Zeppenfeld_DeltaEta', 'DeltaPhi_j1_j2', 'DeltaR_j1_j2']
-        self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal', 'jer']
-        self.jetyearUnc = sum([[f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}', f'UnclusteredEn_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
+        self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal']
+        self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}', f'UnclusteredEn_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
         self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
         self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017']
         self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
@@ -380,6 +380,7 @@ class MyEMuPeak(processor.ProcessorABC):
                continue
              #Make a copy of all Jet/MET var
              else:
+               if 'jer' in jetUnc: jetUnc='jer'
                Jet_collections[f'passJet30ID_{jetUnc}{UpDown}'] = ((getattr(Jet_collections, f'pt_{jetUnc}{UpDown}')>30) & (Jet_collections.jetId>>1) & 1) & (abs(Jet_collections.eta)<4.7) & (((Jet_collections.puId>>2)&1) | (getattr(Jet_collections, f'pt_{jetUnc}{UpDown}')>50))  
                tmpJet_collections = Jet_collections[Jet_collections[f'passJet30ID_{jetUnc}{UpDown}']==1]#getattr(Jet_collections,f'passJet30ID_{jetUnc}{UpDown}')==1]
                tmpJet_collections['pt'] = tmpJet_collections[f'pt_{jetUnc}{UpDown}']
