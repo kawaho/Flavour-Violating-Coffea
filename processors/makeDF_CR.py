@@ -112,11 +112,13 @@ class MyDF(processor.ProcessorABC):
 
         #Choose em channel and IsoMu Trigger
         emevents = events[(events.channel == 0) & (trigger == 1)]
+        #emevents = events[(events.channelIso == 0) & (trigger == 1)]
 
         E_collections = emevents.Electron
         M_collections = emevents.Muon
 
         #Kinematics Selections
+        #emevents["Electron", "Target"] = ((E_collections.pt > 24) & (abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.05) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2Iso_WP80) & (E_collections.lostHits<2))
         emevents["Electron", "Target"] = ((E_collections.pt > 24) & (abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.05) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2noIso_WP80) & (E_collections.pfRelIso03_all < 0.1) & (E_collections.lostHits<2))
         emevents["Muon", "Target"] = ((M_collections.pt > mpt_threshold) & (abs(M_collections.eta) < 2.4) & (abs(M_collections.dxy) < 0.05) & (abs(M_collections.dz) < 0.2) & (M_collections.tightId) & (M_collections.pfRelIso04_all < 0.15))
 
@@ -124,10 +126,12 @@ class MyDF(processor.ProcessorABC):
         M_collections = emevents.Muon[emevents.Muon.Target==1]
 
         #Opposite Charge
-        E_charge = ak.fill_none(ak.pad_none(E_collections.charge, 1, axis=-1), 0, axis=-1)
-        M_charge = ak.fill_none(ak.pad_none(M_collections.charge, 1, axis=-1), 0, axis=-1)
-        opp_charge = ak.flatten(E_charge*M_charge==-1)
-        same_charge = ak.flatten(E_charge*M_charge==1)
+        E_charge = ak.fill_none(ak.pad_none(E_collections.charge, 1, axis=-1), 0, axis=-1)[:,0]
+        M_charge = ak.fill_none(ak.pad_none(M_collections.charge, 1, axis=-1), 0, axis=-1)[:,0]
+        opp_charge = E_charge*M_charge==-1
+        same_charge = E_charge*M_charge==1
+        #opp_charge = ak.flatten(E_charge*M_charge==-1)
+        #same_charge = ak.flatten(E_charge*M_charge==1)
 
         emevents['opp_charge'] = opp_charge
         emevents = emevents[opp_charge | same_charge]
@@ -218,7 +222,7 @@ class MyDF(processor.ProcessorABC):
           SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*Trk_SF*Trk_SF_Hi
   
           #Electron SF and lumi
-          SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF*self._lumiWeight[emevents.metadata["dataset"]]
+          SF = SF*Electron_collections.Reco_SF*Electron_collections.IDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
   
           SF = SF.to_numpy()
           SF[abs(SF)>10] = 0

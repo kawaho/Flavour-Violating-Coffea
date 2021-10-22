@@ -60,12 +60,14 @@ def pt_cen(lep1, lep2, jets):
         return -999
 
 class MyDF(processor.ProcessorABC):
-    def __init__(self, lumiWeight, year):
+    def __init__(self, lumiWeight, year, btag_sf, evaluator):
         self._samples = []
         self._lumiWeight = lumiWeight
         self._year = year
+        self._btag_sf = btag_sf
+        self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "eIso", "mEta", "mIso", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaPhi_j1_em", "DeltaR_j1_em", "Zeppenfeld_1", "Rpt_1", "j1btagDeepFlavB"]
         self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaPhi_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaPhi_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaPhi_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "absZeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "abspt_cen_Deltapt", "Ht_had", "Ht", "j2btagDeepFlavB"]
         for var in self.var_ :
@@ -113,10 +115,10 @@ class MyDF(processor.ProcessorABC):
         M_collections = emevents.Muon[emevents.Muon.Target==1]
 
         #Opposite Charge
-        E_charge = ak.fill_none(ak.pad_none(E_collections.charge, 1, axis=-1), 0, axis=-1)
-        M_charge = ak.fill_none(ak.pad_none(M_collections.charge, 1, axis=-1), 0, axis=-1)
-        opp_charge = ak.flatten(E_charge*M_charge==-1)
-        same_charge = ak.flatten(E_charge*M_charge==1)
+        E_charge = ak.fill_none(ak.pad_none(E_collections.charge, 1, axis=-1), 0, axis=-1)[:,0]
+        M_charge = ak.fill_none(ak.pad_none(M_collections.charge, 1, axis=-1), 0, axis=-1)[:,0]
+        opp_charge = E_charge*M_charge==-1
+        same_charge = E_charge*M_charge==1
 
         emevents['opp_charge'] = opp_charge
         emevents = emevents[opp_charge | same_charge]
@@ -171,11 +173,11 @@ class MyDF(processor.ProcessorABC):
         Electron_collections = Electron_collections[:,0]
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
-
-        if emevents.metadata["dataset"] == 'SingleMuon' or emevents.metadata["dataset"] == 'data':
-            massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
-        else:
-            massRange = (emVar.mass<160) & (emVar.mass>110)
+#
+        #if emevents.metadata["dataset"] == 'SingleMuon' or emevents.metadata["dataset"] == 'data':
+        #    massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
+        #else:
+        massRange = (emVar.mass<160) & (emVar.mass>110)
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def SF(self, emevents):
@@ -201,10 +203,14 @@ class MyDF(processor.ProcessorABC):
             SF = 0.991*SF
   
           #Muon SF
-          SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*self._evaluator['trackerMu'](abs(Muon_collections.eta), Muon_collections.pt)
+          Muon_low = ak.mask(Muon_collections, Muon_collections['pt'] <= 120)
+          Muon_Hi = ak.mask(Muon_collections, Muon_collections['pt'] > 120)
+          Trk_SF = ak.fill_none(self._evaluator['trackerMu'](abs(Muon_low.eta), Muon_low.pt), 1)
+          Trk_SF_Hi = ak.fill_none(self._evaluator['trackerMu_Hi'](abs(Muon_Hi.eta), Muon_Hi.rho), 1)
+          SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*Trk_SF*Trk_SF_Hi
   
           #Electron SF and lumi
-          SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF*self._lumiWeight[emevents.metadata["dataset"]]
+          SF = SF*Electron_collections.Reco_SF*Electron_collections.IDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
   
           SF = SF.to_numpy()
           SF[abs(SF)>10] = 0
@@ -253,7 +259,9 @@ class MyDF(processor.ProcessorABC):
         emevents["njets"] = emevents.nJet30
         emVar = Electron_collections + Muon_collections
         emevents["eEta"] = Electron_collections.eta
+        emevents["eIso"] = Electron_collections.pfRelIso03_all
         emevents["mEta"] = Muon_collections.eta
+        emevents["mIso"] = Muon_collections.pfRelIso04_all
         emevents["e_m_Mass"] = emVar.mass
         emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emevents["e_m_Mass"]
         emevents["ept_Per_e_m_Mass"] = Electron_collections.pt/emevents["e_m_Mass"]
@@ -335,13 +343,13 @@ class MyDF(processor.ProcessorABC):
           for var in self.var_ :
               out[var+'_0jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 0][var].to_numpy() ) )
               out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 2][var].to_numpy() ) )
+              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
           for var in self.var_1jet_ :
               out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 2][var].to_numpy() ) )
+              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
 
           for var in self.var_2jet_ :
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 2][var].to_numpy() ) )
+              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
  
         return out
 
@@ -353,29 +361,35 @@ if __name__ == '__main__':
   current = os.path.dirname(os.path.realpath(__file__))
 #  sys.path.append(os.path.dirname(current))
 #  import find_samples
-  years = ['2017', '2018']
+  years = ['2016preVFP', '2016postVFP', '2017', '2018']
   for year in years:
     with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)
     if '2016' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2016.root"]
+      TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2016HighPt.json"]
       if 'pre' in year:
         TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016preVFP_UL_trackerMuon.json"]
+        btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL16SF.csv", "LOOSE")
       else:
         TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016postVFP_UL_trackerMuon.json"]
+        btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL16SF.csv", "LOOSE")
          
     elif '2017' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2017.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2017.root"]
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2017_UL_trackerMuon.json"]
+      TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2017HighPt.json"]
       btag_sf = BTagScaleFactor("Corrections/bTag/DeepCSV_106XUL17SF_WPonly_V2p1.csv", "LOOSE")
     elif '2018' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_closureOS Corrections/QCD/em_qcd_osss_2018.root", "hist_em_qcd_osss_os_corr hist_em_qcd_extrap_uncert Corrections/QCD/em_qcd_osss_2018.root"]
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2018_UL_trackerMuon.json"]
+      TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2018HighPt.json"]
       btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL18SF_WPonly_V1p1.csv", "LOOSE")
 
     ext = extractor()
     ext.add_weight_sets(QCDhist)
     ext.add_weight_sets(TrackerMu)
+    ext.add_weight_sets(TrackerMu_Hi)
     ext.finalize()
     evaluator = ext.make_evaluator()
 
