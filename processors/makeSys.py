@@ -73,7 +73,7 @@ class MyEMuPeak(processor.ProcessorABC):
         self.var_2jet_VBF_ = ['Zeppenfeld_DeltaEta', 'Ht_had', 'Rpt', 'DeltaEta_j1_j2', 'j1_j2_mass', 'j2pt', 'pt_cen_Deltapt', 'j1pt', 'empt', 'met', 'DeltaEta_e_m']
         self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal']
         self.metUnc = ['UnclusteredEn']
-        self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
+        self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
         self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
         self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017']
         self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
@@ -83,6 +83,9 @@ class MyEMuPeak(processor.ProcessorABC):
         self._accumulator[f'isVBFcat'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'isVBF'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'nJet30'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'is2016'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'is2017'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'is2018'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'mva'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'weight'] = processor.column_accumulator(numpy.array([]))
         for sys in self.jetUnc+self.jetyearUnc:
@@ -136,8 +139,8 @@ class MyEMuPeak(processor.ProcessorABC):
         M_collections = emevents.Muon
 
         #Kinematics Selections
-        emevents["Electron", "Target"] = ((E_collections.pt > 24) & (abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.045) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2noIso_WP80) & (E_collections.pfRelIso03_all < 0.1) & (E_collections.lostHits<2))
-        emevents["Muon", "Target"] = ((M_collections.pt > mpt_threshold) & (abs(M_collections.eta) < 2.4) & (abs(M_collections.dxy) < 0.045) & (abs(M_collections.dz) < 0.2) & (M_collections.tightId) & (M_collections.pfRelIso04_all < 0.15))
+        emevents["Electron", "Target"] = ((E_collections.pt > 24) & (abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.05) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2noIso_WP80) & (E_collections.pfRelIso03_all < 0.1) & (E_collections.lostHits<2))
+        emevents["Muon", "Target"] = ((M_collections.pt > mpt_threshold) & (abs(M_collections.eta) < 2.4) & (abs(M_collections.dxy) < 0.05) & (abs(M_collections.dz) < 0.2) & (M_collections.tightId) & (M_collections.pfRelIso04_all < 0.15))
 
         E_collections = emevents.Electron[emevents.Electron.Target==1]
         M_collections = emevents.Muon[emevents.Muon.Target==1]
@@ -178,17 +181,9 @@ class MyEMuPeak(processor.ProcessorABC):
             MET_collections['phi'] = MET_collections['T1_phi'] 
             MET_collections['pt'] = MET_collections['T1_pt'] 
 
-        #MET corrections Electron
-        Electron_collections['pt'] = Electron_collections['pt']/Electron_collections['eCorr']
-        MET_collections = MET_collections+Electron_collections[:,0]
-        Electron_collections['pt'] = Electron_collections['pt']*Electron_collections['eCorr']
-        MET_collections = MET_collections-Electron_collections[:,0]
-        
         #Muon pT corrections
-        MET_collections = MET_collections+Muon_collections[:,0]
         Muon_collections['mass'] = Muon_collections['mass']*Muon_collections['corrected_pt']/Muon_collections['pt']
         Muon_collections['pt'] = Muon_collections['corrected_pt']
-        MET_collections = MET_collections-Muon_collections[:,0]
 
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
@@ -225,7 +220,7 @@ class MyEMuPeak(processor.ProcessorABC):
         SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*Trk_SF*Trk_SF_Hi
 
         #Electron SF and lumi
-        SF = SF*Electron_collections.Reco_SF*Electron_collections.ID_SF*self._lumiWeight[emevents.metadata["dataset"]]
+        SF = SF*Electron_collections.Reco_SF*Electron_collections.IDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
         SF = SF.to_numpy()
         SF[abs(SF)>10] = 0
         emevents["weight"] = SF
@@ -240,8 +235,10 @@ class MyEMuPeak(processor.ProcessorABC):
           emevents[f"weight_pf_{other_year}_Down"] = SF
 
 	#bTag Up/Down
-        bTagSF_Down = ak.prod(1-emevents.Jet.btagSF_deepjet_L_down*passDeepJet30, axis=1)
-        bTagSF_Up = ak.prod(1-emevents.Jet.btagSF_deepjet_L_up*passDeepJet30, axis=1)
+        btagSF_deepjet_L_down = self._btag_sf.eval("down", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
+        btagSF_deepjet_L_up = self._btag_sf.eval("up", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
+        bTagSF_Down = ak.prod(1-btagSF_deepjet_L_down*emevents.Jet.passDeepJet_L, axis=1)
+        bTagSF_Up = ak.prod(1-btagSF_deepjet_L_up*emevents.Jet.passDeepJet_L, axis=1)
         emevents[f"weight_bTag_{self._year}_Up"] = SF*bTagSF_Up/bTagSF
         emevents[f"weight_bTag_{self._year}_Down"] = SF*bTagSF_Down/bTagSF
 
@@ -269,6 +266,9 @@ class MyEMuPeak(processor.ProcessorABC):
     def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
         #make interesting variables
         #zero/any no. of jets
+        emevents["is2016"] = numpy.ones(len(emevents)) if '2016' in self._year else numpy.zeros(len(emevents))
+        emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))
+        emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
         if 'VBF' in emevents.metadata["dataset"]:
           emevents["isVBF"] = numpy.ones(len(emevents)) 
         else:
@@ -296,7 +296,7 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents["j1_j2_mass"] = (Jet_collections[:,0] + Jet_collections[:,1]).mass
         emevents["DeltaEta_em_j1j2"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - emVar.eta)
         emevents["DeltaEta_j1_j2"] = abs(Jet_collections[:,0].eta - Jet_collections[:,1].eta)
-        emevents["isVBFcat"] = ((emevents["nJet30"] == 2) & (emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5)) 
+        emevents["isVBFcat"] = ((emevents["nJet30"] >= 2) & (emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5)) 
         emevents["isVBFcat"] = ak.fill_none(emevents["isVBFcat"], 0)
         emevents["Zeppenfeld_DeltaEta"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
         emevents["Rpt"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
@@ -323,18 +323,18 @@ class MyEMuPeak(processor.ProcessorABC):
           #Redo all Muon var
           tmpemVar = Electron_collections + tmpMuon_collections
           emevents[f'e_m_Mass_me_{UpDown}'] = tmpemVar.mass
-          emevents["mpt_Per_e_m_Mass"+f'_me_{UpDown}'] = tmpMuon_collections.pt/emevents[f'e_m_Mass_me_{UpDown}']
-          emevents["ept_Per_e_m_Mass"+f'_me_{UpDown}'] = Electron_collections.pt/emevents[f'e_m_Mass_me_{UpDown}']
-          emevents["empt"+f'_me_{UpDown}'] = tmpemVar.pt
-          emevents["DeltaEta_e_m"+f'_me_{UpDown}'] = abs(tmpMuon_collections.eta - Electron_collections.eta)
-          emevents["m_met_mT"+f'_me_{UpDown}'] = mT(tmpMuon_collections, MET_collections)
+          emevents[f"mpt_Per_e_m_Mass_me_{UpDown}"] = tmpMuon_collections.pt/emevents[f'e_m_Mass_me_{UpDown}']
+          emevents[f"ept_Per_e_m_Mass_me_{UpDown}"] = Electron_collections.pt/emevents[f'e_m_Mass_me_{UpDown}']
+          emevents[f"empt_me_{UpDown}"] = tmpemVar.pt
+          emevents[f"DeltaEta_e_m_me_{UpDown}"] = abs(tmpMuon_collections.eta - Electron_collections.eta)
+          emevents[f"m_met_mT_me_{UpDown}"] = mT(tmpMuon_collections, MET_collections)
           pZeta_, pZetaVis_ = pZeta(tmpMuon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
-          emevents["pZeta85"+f'_me_{UpDown}'] = pZeta_ - 0.85*pZetaVis_
-          emevents["DeltaEta_j1_em"+f'_me_{UpDown}'] = abs(Jet_collections[:,0].eta - tmpemVar.eta)
-          emevents["DeltaEta_em_j1j2"+f'_me_{UpDown}'] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - tmpemVar.eta)
-          emevents["Zeppenfeld_DeltaEta"+f'_me_{UpDown}'] = Zeppenfeld(tmpMuon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
-          emevents["Rpt"+f'_me_{UpDown}'] = Rpt(tmpMuon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
-          emevents["pt_cen_Deltapt"+f'_me_{UpDown}'] = pt_cen(tmpMuon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/(Jet_collections[:,0] - Jet_collections[:,1]).pt
+          emevents[f"pZeta85_me_{UpDown}"] = pZeta_ - 0.85*pZetaVis_
+          emevents[f"DeltaEta_j1_em_me_{UpDown}"] = abs(Jet_collections[:,0].eta - tmpemVar.eta)
+          emevents[f"DeltaEta_em_j1j2_me_{UpDown}"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - tmpemVar.eta)
+          emevents[f"Zeppenfeld_DeltaEta_me_{UpDown}"] = Zeppenfeld(tmpMuon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
+          emevents[f"Rpt_me_{UpDown}"] = Rpt(tmpMuon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
+          emevents[f"pt_cen_Deltapt_me_{UpDown}"] = pt_cen(tmpMuon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/(Jet_collections[:,0] - Jet_collections[:,1]).pt
 
           #Unclustered
           tmpMET_collections = ak.copy(MET_collections)
@@ -345,16 +345,14 @@ class MyEMuPeak(processor.ProcessorABC):
           emevents[f"met_UnclusteredEn_{UpDown}"] = tmpMET_collections.pt
           emevents[f"e_met_mT_UnclusteredEn_{UpDown}"] = mT(Electron_collections, tmpMET_collections)
           emevents[f"m_met_mT_UnclusteredEn_{UpDown}"] = mT(Muon_collections, tmpMET_collections)
-
           pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  tmpMET_collections.px,  tmpMET_collections.py)
           emevents["pZeta85_UnclusteredEn_{UpDown}"] = pZeta_ - 0.85*pZetaVis_
   
           #Jet Unc
           Jet_collections = emevents.Jet
           for jetUnc in self.jetUnc+self.jetyearUnc:
-             if jetUnc in self.jetyearUnc and not self._year in self.jetyearUnc:
-               continue
-             #Make a copy of all Jet/MET var
+             if jetUnc in self.jetyearUnc and not self._year in jetUnc:
+               #Make a copy of all Jet/MET var
                emevents[f"nJet30_{jetUnc}_{UpDown}"] = emevents["nJet30"]
                emevents[f"met_{jetUnc}_{UpDown}"] = emevents["met"]
                emevents[f"e_met_mT_{jetUnc}_{UpDown}"] = emevents["e_met_mT"]
@@ -373,20 +371,23 @@ class MyEMuPeak(processor.ProcessorABC):
                emevents[f"pt_cen_Deltapt_{jetUnc}_{UpDown}"] = emevents["pt_cen_Deltapt"]
                emevents[f"Ht_had_{jetUnc}_{UpDown}"] = emevents["Ht_had"]
              else:
-               if 'jer' in jetUnc: jetUnc='jer'
-               Jet_collections[f'passJet30ID_{jetUnc}{UpDown}'] = ((getattr(Jet_collections, f'pt_{jetUnc}{UpDown}')>30) & (Jet_collections.jetId>>1) & 1) & (abs(Jet_collections.eta)<4.7) & (((Jet_collections.puId>>2)&1) | (getattr(Jet_collections, f'pt_{jetUnc}{UpDown}')>50))  
+               if 'jer' in jetUnc: 
+                 jetUncNoyear='jer'
+               else:
+                 jetUncNoyear=jetUnc
+               Jet_collections[f'passJet30ID_{jetUnc}{UpDown}'] = ((getattr(Jet_collections, f'pt_{jetUncNoyear}{UpDown}')>30) & (Jet_collections.jetId>>1) & 1) & (abs(Jet_collections.eta)<4.7) & (((Jet_collections.puId>>2)&1) | (getattr(Jet_collections, f'pt_{jetUncNoyear}{UpDown}')>50))  
                tmpJet_collections = Jet_collections[Jet_collections[f'passJet30ID_{jetUnc}{UpDown}']==1]
-               emevents[f"nJet30_{jetUnc}_{UpDown}"] = ak.num(tmpJet_collections, axis=-1)
-               tmpJet_collections['pt'] = tmpJet_collections[f'pt_{jetUnc}{UpDown}']
-               tmpJet_collections['mass'] = getattr(tmpJet_collections, f'mass_{jetUnc}{UpDown}')
+               emevents[f"nJet30_{jetUnc}_{UpDown}"] = ak.num(tmpJet_collections)
+               tmpJet_collections['pt'] = tmpJet_collections[f'pt_{jetUncNoyear}{UpDown}']
+               tmpJet_collections['mass'] = tmpJet_collections[f'mass_{jetUncNoyear}{UpDown}']
                #ensure Jets are pT-ordered
                tmpJet_collections = tmpJet_collections[ak.argsort(tmpJet_collections.pt, axis=1, ascending=False)]
                #padding to have at least "2 jets"
                tmpJet_collections = ak.pad_none(tmpJet_collections, 2, clip=True)
                #MET
                tmpMET_collections = ak.copy(emevents.MET)
-               tmpMET_collections['pt'] = getattr(emevents.MET, f'T1Smear_pt_{jetUnc}{UpDown}')
-               tmpMET_collections['phi'] = getattr(emevents.MET, f'T1Smear_phi_{jetUnc}{UpDown}')
+               tmpMET_collections['pt'] = emevents.MET[f'T1Smear_pt_{jetUncNoyear}{UpDown}']
+               tmpMET_collections['phi'] = emevents.MET[f'T1Smear_phi_{jetUncNoyear}{UpDown}']
                #Redo all Jet/MET var
                emevents[f"met_{jetUnc}_{UpDown}"] = tmpMET_collections.pt
                emevents[f"e_met_mT_{jetUnc}_{UpDown}"] = mT(Electron_collections, tmpMET_collections)
@@ -400,9 +401,9 @@ class MyEMuPeak(processor.ProcessorABC):
                emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] = (tmpJet_collections[:,0] + tmpJet_collections[:,1]).mass
                emevents[f"DeltaEta_em_j1j2_{jetUnc}_{UpDown}"] = abs((tmpJet_collections[:,0] + tmpJet_collections[:,1]).eta - emVar.eta)
                emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"] = abs(tmpJet_collections[:,0].eta - tmpJet_collections[:,1].eta)
-               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ((emevents[f"nJet30_{jetUnc}_{UpDown}"] == 2) & (emevents["j1_j2_mass_{jetUnc}_{UpDown}"] > 400) & (emevents["DeltaEta_j1_j2_{jetUnc}_{UpDown}"] > 2.5)) 
-               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ak.fill_none(emevents["isVBFcat_{jetUnc}_{UpDown}"], 0)
-               emevents[f"Zeppenfeld_DeltaEta_{jetUnc}_{UpDown}"] = Zeppenfeld(Muon_collections, Electron_collections, [tmpJet_collections[:,0], tmpJet_collections[:,1]])/emevents["DeltaEta_j1_j2_{jetUnc}_{UpDown}"]
+               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ((emevents[f"nJet30_{jetUnc}_{UpDown}"] >= 2) & (emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] > 400) & (emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"] > 2.5)) 
+               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ak.fill_none(emevents[f"isVBFcat_{jetUnc}_{UpDown}"], 0)
+               emevents[f"Zeppenfeld_DeltaEta_{jetUnc}_{UpDown}"] = Zeppenfeld(Muon_collections, Electron_collections, [tmpJet_collections[:,0], tmpJet_collections[:,1]])/emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"]
                emevents[f"Rpt_{jetUnc}_{UpDown}"] = Rpt(Muon_collections, Electron_collections, [tmpJet_collections[:,0], tmpJet_collections[:,1]])
                emevents[f"pt_cen_Deltapt_{jetUnc}_{UpDown}"] = pt_cen(Muon_collections, Electron_collections, [tmpJet_collections[:,0], tmpJet_collections[:,1]])/(tmpJet_collections[:,0] - tmpJet_collections[:,1]).pt
                emevents[f"Ht_had_{jetUnc}_{UpDown}"] = ak.sum(tmpJet_collections.pt, 1)
@@ -420,10 +421,10 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents_2jet_GG_nom = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
         emevents_2jet_VBF_nom = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
 
-        var_0jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents_0jet.fields else i for i in self.var_0jet_] 
-        var_1jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents_1jet.fields else i for i in self.var_1jet_] 
-        var_2jet_GG_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents_2jet_GG.fields else i for i in self.var_2jet_GG_] 
-        var_2jet_VBF_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents_2jet_VBF.fields else i for i in self.var_2jet_VBF_] 
+        var_0jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_0jet_] 
+        var_1jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_1jet_] 
+        var_2jet_GG_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_2jet_GG_] 
+        var_2jet_VBF_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_2jet_VBF_] 
 
         Xframe_0jet = ak.to_pandas(emevents[var_0jet_alt])
         Xframe_1jet = ak.to_pandas(emevents[var_1jet_alt])
@@ -436,11 +437,12 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents_2jet_VBF = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
 
         if isJetSys:
-          emevents['mva_{unc}_{updown}'] = (emevents[f"nJet30_{unc}_{updown}"] == 0) * emevents_0jet + (emevents[f"nJet30_{unc}_{updown}"] == 1) * emevents_1jet + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==0)) * emevents_2jet_GG + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==1))* emevents_2jet_VBF
+          emevents[f'mva_{unc}_{updown}'] = (emevents[f"nJet30_{unc}_{updown}"] == 0) * emevents_0jet + (emevents[f"nJet30_{unc}_{updown}"] == 1) * emevents_1jet + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==0)) * emevents_2jet_GG + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==1))* emevents_2jet_VBF
           emevents['mva'] = (emevents[f"nJet30_{unc}_{updown}"] == 0) * emevents_0jet_nom + (emevents[f"nJet30_{unc}_{updown}"] == 1) * emevents_1jet_nom + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==0)) * emevents_2jet_GG_nom + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==1)) * emevents_2jet_VBF_nom
         else:
-          emevents['mva_{unc}_{updown}'] = (emevents.nJet30 == 0) * emevents_0jet + (emevents.nJet30 == 1) * emevents_1jet + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF
+          emevents[f'mva_{unc}_{updown}'] = (emevents.nJet30 == 0) * emevents_0jet + (emevents.nJet30 == 1) * emevents_1jet + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF
           emevents['mva'] = (emevents.nJet30 == 0) * emevents_0jet_nom + (emevents.nJet30 == 1) * emevents_1jet_nom + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG_nom + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF_nom
+        return emevents
 
     # we will receive a NanoEvents instead of a coffea DataFrame
     def process(self, events):
@@ -451,12 +453,12 @@ class MyEMuPeak(processor.ProcessorABC):
           emevents = self.SF(emevents)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
           for sys in self.leptonUnc+self.metUnc:
-            self.pandasDF(emevents, sys, 'Up')
-            self.pandasDF(emevents, sys, 'Down')
+            emevents = self.pandasDF(emevents, sys, 'Up')
+            emevents = self.pandasDF(emevents, sys, 'Down')
 
-          for jetUnc in self.jetUnc+self.jetyearUnc:
-            self.pandasDF(emevents, sys, 'Up', True)
-            self.pandasDF(emevents, sys, 'Down', True)
+          for sys in self.jetUnc+self.jetyearUnc:
+            emevents = self.pandasDF(emevents, sys, 'Up', True)
+            emevents = self.pandasDF(emevents, sys, 'Down', True)
 
           for sys_var_ in out:
             acc = emevents[sys_var_].to_numpy()
