@@ -61,16 +61,16 @@ def pt_cen(lep1, lep2, jets):
         return -999
 
 class MyEMuPeak(processor.ProcessorABC):
-    def __init__(self, lumiWeight, BDTmodels, year, btag_sf, evaluator):
+    def __init__(self, lumiWeight, BDTmodels, BDTvars, year, btag_sf, evaluator):
         self._lumiWeight = lumiWeight
         self._BDTmodels = BDTmodels
         self._btag_sf = btag_sf
         self._evaluator = evaluator
         self._year = year
-        self.var_0jet_ = ['e_met_mT', 'm_met_mT', 'mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaEta_e_m', 'pZeta85'] 
-        self.var_1jet_ = ['j1pt', 'j1Eta', 'DeltaEta_j1_em', 'e_met_mT', 'm_met_mT', 'empt', 'met', 'DeltaEta_e_m', 'pZeta85']
-        self.var_2jet_GG_ = ['Ht_had', 'Rpt', 'DeltaEta_j1_j2', 'j1_j2_mass', 'j2pt', 'pt_cen_Deltapt', 'DeltaEta_em_j1j2', 'j1pt', 'empt', 'met', 'DeltaEta_e_m']
-        self.var_2jet_VBF_ = ['Zeppenfeld_DeltaEta', 'Ht_had', 'Rpt', 'DeltaEta_j1_j2', 'j1_j2_mass', 'j2pt', 'pt_cen_Deltapt', 'j1pt', 'empt', 'met', 'DeltaEta_e_m']
+        self.var_0jet_ = BDTvars['model_GG_0jets'] 
+        self.var_1jet_ = BDTvars['model_GG_1jets']
+        self.var_2jet_GG_ = BDTvars['model_GG_2jets']
+        self.var_2jet_VBF_ = BDTvars['model_VBF_2jets']
         self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal']
         self.metUnc = ['UnclusteredEn']
         self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
@@ -375,7 +375,7 @@ class MyEMuPeak(processor.ProcessorABC):
                  jetUncNoyear='jer'
                else:
                  jetUncNoyear=jetUnc
-               Jet_collections[f'passJet30ID_{jetUnc}{UpDown}'] = ((getattr(Jet_collections, f'pt_{jetUncNoyear}{UpDown}')>30) & (Jet_collections.jetId>>1) & 1) & (abs(Jet_collections.eta)<4.7) & (((Jet_collections.puId>>2)&1) | (getattr(Jet_collections, f'pt_{jetUncNoyear}{UpDown}')>50))  
+               Jet_collections[f'passJet30ID_{jetUnc}{UpDown}'] = (Electron_collections.delta_r(Jet_collections) > 0.4) & (Muon_collections.delta_r(Jet_collections) > 0.4) & (Jet_collections[f'pt_{jetUncNoyear}{UpDown}']>30) & ((Jet_collections.jetId>>1) & 1) & (abs(Jet_collections.eta)<4.7) & (((Jet_collections.puId>>2)&1) | (Jet_collections[f'pt_{jetUncNoyear}{UpDown}']>50))  
                tmpJet_collections = Jet_collections[Jet_collections[f'passJet30ID_{jetUnc}{UpDown}']==1]
                emevents[f"nJet30_{jetUnc}_{UpDown}"] = ak.num(tmpJet_collections)
                tmpJet_collections['pt'] = tmpJet_collections[f'pt_{jetUncNoyear}{UpDown}']
@@ -410,38 +410,47 @@ class MyEMuPeak(processor.ProcessorABC):
 
         return emevents
 
-    def pandasDF(self, emevents, unc, updown, isJetSys=False):
-        Xframe_0jet = ak.to_pandas(emevents[self.var_0jet_])
-        Xframe_1jet = ak.to_pandas(emevents[self.var_1jet_])
-        Xframe_2jet_GG = ak.to_pandas(emevents[self.var_2jet_GG_])
-        Xframe_2jet_VBF = ak.to_pandas(emevents[self.var_2jet_VBF_])
-   
-        emevents_0jet_nom = self.BDTscore(0, Xframe_0jet)[:,1] 
-        emevents_1jet_nom = self.BDTscore(1, Xframe_1jet)[:,1] 
-        emevents_2jet_GG_nom = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
-        emevents_2jet_VBF_nom = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
-
-        var_0jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_0jet_] 
-        var_1jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_1jet_] 
-        var_2jet_GG_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_2jet_GG_] 
-        var_2jet_VBF_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_2jet_VBF_] 
-
-        Xframe_0jet = ak.to_pandas(emevents[var_0jet_alt])
-        Xframe_1jet = ak.to_pandas(emevents[var_1jet_alt])
-        Xframe_2jet_GG = ak.to_pandas(emevents[var_2jet_GG_alt])
-        Xframe_2jet_VBF = ak.to_pandas(emevents[var_2jet_VBF_alt])
-   
-        emevents_0jet = self.BDTscore(0, Xframe_0jet)[:,1] 
-        emevents_1jet = self.BDTscore(1, Xframe_1jet)[:,1] 
-        emevents_2jet_GG = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
-        emevents_2jet_VBF = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
-
-        if isJetSys:
-          emevents[f'mva_{unc}_{updown}'] = (emevents[f"nJet30_{unc}_{updown}"] == 0) * emevents_0jet + (emevents[f"nJet30_{unc}_{updown}"] == 1) * emevents_1jet + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==0)) * emevents_2jet_GG + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==1))* emevents_2jet_VBF
-          emevents['mva'] = (emevents[f"nJet30_{unc}_{updown}"] == 0) * emevents_0jet_nom + (emevents[f"nJet30_{unc}_{updown}"] == 1) * emevents_1jet_nom + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==0)) * emevents_2jet_GG_nom + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==1)) * emevents_2jet_VBF_nom
-        else:
-          emevents[f'mva_{unc}_{updown}'] = (emevents.nJet30 == 0) * emevents_0jet + (emevents.nJet30 == 1) * emevents_1jet + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF
+    def pandasDF(self, emevents, unc=None, updown=None, isJetSys=False):
+        if unc==None:
+          Xframe_0jet = ak.to_pandas(emevents[self.var_0jet_])
+          Xframe_1jet = ak.to_pandas(emevents[self.var_1jet_])
+          Xframe_2jet_GG = ak.to_pandas(emevents[self.var_2jet_GG_])
+          Xframe_2jet_VBF = ak.to_pandas(emevents[self.var_2jet_VBF_])
+     
+          emevents_0jet_nom = self.BDTscore(0, Xframe_0jet)[:,1] 
+          emevents_1jet_nom = self.BDTscore(1, Xframe_1jet)[:,1] 
+          emevents_2jet_GG_nom = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
+          emevents_2jet_VBF_nom = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
           emevents['mva'] = (emevents.nJet30 == 0) * emevents_0jet_nom + (emevents.nJet30 == 1) * emevents_1jet_nom + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG_nom + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF_nom
+        else:
+          var_0jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_0jet_] 
+          var_1jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_1jet_] 
+          var_2jet_GG_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_2jet_GG_] 
+          var_2jet_VBF_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_2jet_VBF_] 
+
+          Xframe_0jet = ak.to_pandas(emevents[var_0jet_alt])
+          Xframe_1jet = ak.to_pandas(emevents[var_1jet_alt])
+          Xframe_2jet_GG = ak.to_pandas(emevents[var_2jet_GG_alt])
+          Xframe_2jet_VBF = ak.to_pandas(emevents[var_2jet_VBF_alt])
+  
+          rename0_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_0jet_alt}
+          rename1_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_1jet_alt}
+          rename2_GG_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_2jet_GG_alt}
+          rename2_VBF_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_2jet_VBF_alt}
+
+          Xframe_0jet.rename(columns=rename0_, inplace = True)
+          Xframe_1jet.rename(columns=rename1_, inplace = True)
+          Xframe_2jet_GG.rename(columns=rename2_GG_, inplace = True)
+          Xframe_2jet_VBF.rename(columns=rename2_VBF_, inplace = True)
+     
+          emevents_0jet = self.BDTscore(0, Xframe_0jet)[:,1] 
+          emevents_1jet = self.BDTscore(1, Xframe_1jet)[:,1] 
+          emevents_2jet_GG = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
+          emevents_2jet_VBF = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
+          if isJetSys:
+            emevents[f'mva_{unc}_{updown}'] = (emevents[f"nJet30_{unc}_{updown}"] == 0) * emevents_0jet + (emevents[f"nJet30_{unc}_{updown}"] == 1) * emevents_1jet + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==0)) * emevents_2jet_GG + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==1))* emevents_2jet_VBF
+          else:
+            emevents[f'mva_{unc}_{updown}'] = (emevents.nJet30 == 0) * emevents_0jet + (emevents.nJet30 == 1) * emevents_1jet + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF
         return emevents
 
     # we will receive a NanoEvents instead of a coffea DataFrame
@@ -452,6 +461,7 @@ class MyEMuPeak(processor.ProcessorABC):
           emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
           emevents = self.SF(emevents)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
+          emevents = self.pandasDF(emevents)
           for sys in self.leptonUnc+self.metUnc:
             emevents = self.pandasDF(emevents, sys, 'Up')
             emevents = self.pandasDF(emevents, sys, 'Down')
@@ -474,9 +484,13 @@ class MyEMuPeak(processor.ProcessorABC):
 if __name__ == '__main__':
   BDTjsons = ['model_GG_0jets', 'model_GG_1jets', 'model_GG_2jets', 'model_VBF_2jets']
   BDTmodels = {}
+  BDTvars = {}
   for BDTjson in BDTjsons:
     BDTmodels[BDTjson] = xgb.XGBClassifier()
-    BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/{BDTjson}.bin')
+    BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/{BDTjson}.json')
+    BDTvars[BDTjson] = BDTmodels[BDTjson].get_booster().feature_names
+
+    print(BDTmodels[BDTjson].get_booster().feature_names)
   print(BDTmodels)
   years = ['2016preVFP', '2016postVFP', '2017', '2018']
   for year in years:
@@ -509,6 +523,6 @@ if __name__ == '__main__':
     ext.add_weight_sets(TrackerMu_Hi)
     ext.finalize()
     evaluator = ext.make_evaluator()
-    processor_instance = MyEMuPeak(lumiWeight, BDTmodels, year, btag_sf, evaluator)
+    processor_instance = MyEMuPeak(lumiWeight, BDTmodels, BDTvars, year, btag_sf, evaluator)
     outname = os.path.basename(__file__).replace('.py','')
     save(processor_instance, f'processors/{outname}_{year}.coffea')

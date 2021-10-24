@@ -59,14 +59,14 @@ def pt_cen(lep1, lep2, jets):
         return -999
 
 class MyEMuPeak(processor.ProcessorABC):
-    def __init__(self, lumiWeight, BDTmodels, year):
+    def __init__(self, lumiWeight, BDTmodels, BDTvars, year):
         self._lumiWeight = lumiWeight
         self._BDTmodels = BDTmodels
         self._year = year
-        self.var_0jet_ = ['e_met_mT', 'm_met_mT', 'mpt_Per_e_m_Mass', 'ept_Per_e_m_Mass', 'empt', 'met', 'DeltaEta_e_m', 'pZeta85'] 
-        self.var_1jet_ = ['j1pt', 'j1Eta', 'DeltaEta_j1_em', 'e_met_mT', 'm_met_mT', 'empt', 'met', 'DeltaEta_e_m', 'pZeta85']
-        self.var_2jet_GG_ = ['Ht_had', 'Rpt', 'DeltaEta_j1_j2', 'j1_j2_mass', 'j2pt', 'pt_cen_Deltapt', 'DeltaEta_em_j1j2', 'j1pt', 'empt', 'met', 'DeltaEta_e_m']
-        self.var_2jet_VBF_ = ['Zeppenfeld_DeltaEta', 'Ht_had', 'Rpt', 'DeltaEta_j1_j2', 'j1_j2_mass', 'j2pt', 'pt_cen_Deltapt', 'j1pt', 'empt', 'met', 'DeltaEta_e_m']
+        self.var_0jet_ = BDTvars['model_GG_0jets'] 
+        self.var_1jet_ = BDTvars['model_GG_1jets']
+        self.var_2jet_GG_ = BDTvars['model_GG_2jets']
+        self.var_2jet_VBF_ = BDTvars['model_VBF_2jets']
         self._accumulator = processor.dict_accumulator({})
         self._accumulator[f'e_m_Mass'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'mva'] = processor.column_accumulator(numpy.array([]))
@@ -177,7 +177,6 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
         #1 jet
         emevents['j1pt'] = Jet_collections[:,0].pt
-        print(emevents["e_met_mT"])
         emevents['j1Eta'] = Jet_collections[:,0].eta
         emevents["DeltaEta_j1_em"] = abs(Jet_collections[:,0].eta - emVar.eta)
 
@@ -215,7 +214,7 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents = self.Vetos(events)
         if len(emevents)>0:
           emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
-          emevents = SF(emevents)
+          emevents = self.SF(emevents)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
           emevents = self.pandasDF(emevents)
 
@@ -232,14 +231,18 @@ class MyEMuPeak(processor.ProcessorABC):
 if __name__ == '__main__':
   BDTjsons = ['model_GG_0jets', 'model_GG_1jets', 'model_GG_2jets', 'model_VBF_2jets']
   BDTmodels = {}
+  BDTvars = {}
   for BDTjson in BDTjsons:
     BDTmodels[BDTjson] = xgb.XGBClassifier()
-    BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/{BDTjson}.bin')
+    BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/{BDTjson}.json')
+    BDTvars[BDTjson] = BDTmodels[BDTjson].get_booster().feature_names
+
+    print(BDTmodels[BDTjson].get_booster().feature_names)
   print(BDTmodels)
   years = ['2016preVFP', '2016postVFP', '2017', '2018']
   for year in years:
     with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)
-    processor_instance = MyEMuPeak(lumiWeight, BDTmodels, year)
+    processor_instance = MyEMuPeak(lumiWeight, BDTmodels, BDTvars, year)
     outname = os.path.basename(__file__).replace('.py','')
     save(processor_instance, f'processors/{outname}_{year}.coffea')
