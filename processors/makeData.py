@@ -199,7 +199,6 @@ class MyEMuPeak(processor.ProcessorABC):
         Xframe_1jet = ak.to_pandas(emevents[self.var_1jet_])
         Xframe_2jet_GG = ak.to_pandas(emevents[self.var_2jet_GG_])
         Xframe_2jet_VBF = ak.to_pandas(emevents[self.var_2jet_VBF_])
-   
         emevents_0jet_nom = self.BDTscore(0, Xframe_0jet)[:,1] 
         emevents_1jet_nom = self.BDTscore(1, Xframe_1jet)[:,1] 
         emevents_2jet_GG_nom = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
@@ -212,17 +211,17 @@ class MyEMuPeak(processor.ProcessorABC):
     def process(self, events):
         out = self.accumulator.identity()
         emevents = self.Vetos(events)
-        if len(emevents)>0:
-          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
-          emevents = self.SF(emevents)
-          emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
-          emevents = self.pandasDF(emevents)
-
-          for sys_var_ in out:
-            acc = emevents[sys_var_].to_numpy()
-            out[sys_var_].add( processor.column_accumulator( acc ) )
-        else:
-          print("No Events found in "+emevents.metadata["dataset"]) 
+        if len(emevents)==0: return out
+        emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
+        if len(emevents)==0: return out
+        emevents = self.SF(emevents)
+        emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
+        emevents = self.pandasDF(emevents)
+        for sys_var_ in out:
+          acc = emevents[sys_var_].to_numpy()
+          out[sys_var_].add( processor.column_accumulator( acc ) )
+        #else:
+        #  print("No Events found in "+emevents.metadata["dataset"]) 
         return out
 
     def postprocess(self, accumulator):

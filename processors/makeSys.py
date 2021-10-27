@@ -30,14 +30,15 @@ def pZeta(leg1, leg2, MET_px, MET_py):
 
 def Rpt(lep1, lep2, jets=None):
     emVar = lep1+lep2
-    if jets==None:
-        return (emVar).pt/(lep1.pt+lep2.pt)
-    elif len(jets)==1:
-        return (emVar + jets[0]).pt/(lep1.pt+lep2.pt+jets[0].pt)
-    elif len(jets)==2:
-        return (emVar + jets[0] +jets[1]).pt/(lep1.pt+lep2.pt+jets[0].pt+jets[1].pt)
-    else:
-        return -999
+    return (emVar + jets[0] +jets[1]).pt/(lep1.pt+lep2.pt+jets[0].pt+jets[1].pt)
+   # if jets==None:
+   #     return (emVar).pt/(lep1.pt+lep2.pt)
+   # elif len(jets)==1:
+   #     return (emVar + jets[0]).pt/(lep1.pt+lep2.pt+jets[0].pt)
+   # elif len(jets)==2:
+   #     return (emVar + jets[0] +jets[1]).pt/(lep1.pt+lep2.pt+jets[0].pt+jets[1].pt)
+   # else:
+   #     return -999
     
 def Zeppenfeld(lep1, lep2, jets):
     emVar = lep1+lep2
@@ -95,7 +96,7 @@ class MyEMuPeak(processor.ProcessorABC):
             self._accumulator[f'isVBFcat_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'nJet30_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'nJet30_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
-        for sys in self.leptonUnc+self.metUnc:
+        for sys in self.metUnc:
             self._accumulator[f'mva_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'mva_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
         for sys in self.theoUnc:
@@ -104,6 +105,8 @@ class MyEMuPeak(processor.ProcessorABC):
             self._accumulator[f'weight_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'weight_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
         for sys in self.leptonUnc:
+            self._accumulator[f'mva_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
+            self._accumulator[f'mva_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'e_m_Mass_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'e_m_Mass_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
 
@@ -319,6 +322,7 @@ class MyEMuPeak(processor.ProcessorABC):
   
           #Muon Energy Scale + Reso 
           tmpMuon_collections = ak.copy(Muon_collections)
+          tmpMuon_collections['mass'] = tmpMuon_collections['mass']*tmpMuon_collections[f'corrected{UpDown}_pt']/tmpMuon_collections['pt']
           tmpMuon_collections['pt'] = tmpMuon_collections[f'corrected{UpDown}_pt']
           #Redo all Muon var
           tmpemVar = Electron_collections + tmpMuon_collections
@@ -349,7 +353,7 @@ class MyEMuPeak(processor.ProcessorABC):
           emevents["pZeta85_UnclusteredEn_{UpDown}"] = pZeta_ - 0.85*pZetaVis_
   
           #Jet Unc
-          Jet_collections = emevents.Jet
+          semitmpJet_collections = ak.copy(emevents.Jet)
           for jetUnc in self.jetUnc+self.jetyearUnc:
              if jetUnc in self.jetyearUnc and not self._year in jetUnc:
                #Make a copy of all Jet/MET var
@@ -375,8 +379,8 @@ class MyEMuPeak(processor.ProcessorABC):
                  jetUncNoyear='jer'
                else:
                  jetUncNoyear=jetUnc
-               Jet_collections[f'passJet30ID_{jetUnc}{UpDown}'] = (Electron_collections.delta_r(Jet_collections) > 0.4) & (Muon_collections.delta_r(Jet_collections) > 0.4) & (Jet_collections[f'pt_{jetUncNoyear}{UpDown}']>30) & ((Jet_collections.jetId>>1) & 1) & (abs(Jet_collections.eta)<4.7) & (((Jet_collections.puId>>2)&1) | (Jet_collections[f'pt_{jetUncNoyear}{UpDown}']>50))  
-               tmpJet_collections = Jet_collections[Jet_collections[f'passJet30ID_{jetUnc}{UpDown}']==1]
+               semitmpJet_collections[f'passJet30ID_{jetUnc}{UpDown}'] = (Electron_collections.delta_r(semitmpJet_collections) > 0.4) & (Muon_collections.delta_r(semitmpJet_collections) > 0.4) & (semitmpJet_collections[f'pt_{jetUncNoyear}{UpDown}']>30) & ((semitmpJet_collections.jetId>>1) & 1) & (abs(semitmpJet_collections.eta)<4.7) & (((semitmpJet_collections.puId>>2)&1) | (semitmpJet_collections[f'pt_{jetUncNoyear}{UpDown}']>50))  
+               tmpJet_collections = semitmpJet_collections[semitmpJet_collections[f'passJet30ID_{jetUnc}{UpDown}']==1]
                emevents[f"nJet30_{jetUnc}_{UpDown}"] = ak.num(tmpJet_collections)
                tmpJet_collections['pt'] = tmpJet_collections[f'pt_{jetUncNoyear}{UpDown}']
                tmpJet_collections['mass'] = tmpJet_collections[f'mass_{jetUncNoyear}{UpDown}']
