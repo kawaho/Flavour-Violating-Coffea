@@ -34,11 +34,18 @@ for year in years:
 #Get total weight of all years for acceptance calculations
 theory_total_weight = {}
 df = pd.DataFrame(var_dict)
-theory_total_weight["weight"] = df["weight"].sum()
-theory_total_weight["weight_scalep5p5"] = df["weight_scalep5p5"].sum()
-theory_total_weight["weight_scale22"] = df["weight_scale22"].sum()
+
+theory_total_weight["weight_GG"] = df[(df['isVBF']==0)]["weight"].sum()
+theory_total_weight["weight_scalep5p5_GG"] = df[(df['isVBF']==0)]["weight_scalep5p5"].sum()
+theory_total_weight["weight_scale22_GG"] = df[(df['isVBF']==0)]["weight_scale22"].sum()
 for i in range(103):
-  theory_total_weight[f"weight_lhe{i}"] = df[f"weight_lhe{i}"].sum()
+  theory_total_weight[f"weight_lhe{i}_GG"] = df[(df['isVBF']==0)][f"weight_lhe{i}"].sum()
+
+theory_total_weight["weight_VBF"] = df[(df['isVBF']==1)]["weight"].sum()
+theory_total_weight["weight_scalep5p5_VBF"] = df[(df['isVBF']==1)]["weight_scalep5p5"].sum()
+theory_total_weight["weight_scale22_VBF"] = df[(df['isVBF']==1)]["weight_scale22"].sum()
+for i in range(103):
+  theory_total_weight[f"weight_lhe{i}_VBF"] = df[(df['isVBF']==1)][f"weight_lhe{i}"].sum()
 
 #Separate into two dataframe: one for VBF cat and GG cat
 df_ggcat, df_vbfcat = df[(df['isVBFcat']==0)], df[(df['isVBFcat']==1)]
@@ -64,6 +71,7 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
   #Get mva values corresponding to 100 quantiles 
   wq = DescrStatsW(data=df_gg_vbf['mva'], weights=df_gg_vbf['weight'])
   quantiles = wq.quantile(probs=np.linspace(0,1,101), return_pandas=False)
+  quantiles[0], quantiles[-1] = 0, 1
   quantiles.dump(f"results/{whichcat}_quantiles")
   #with open(f"{whichcat}_quantiles.json", 'w') as f:
   #  json.dump(quantiles, f, indent=2) 
@@ -113,10 +121,10 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
       dict_.append(["weight2016", subdf[subdf["is2016"]==1]["weight"].sum()])
       dict_.append(["weight2017", subdf[subdf["is2017"]==1]["weight"].sum()])
       dict_.append(["weight2018", subdf[subdf["is2018"]==1]["weight"].sum()])
-      dict_.append(['acc', subdf['weight'].sum()/theory_total_weight['weight']])
+      dict_.append(['acc', subdf['weight'].sum()/theory_total_weight[f'weight_{whichcat_deep}']])
     
       for sys in theoUnc:
-        dict_.append([f'weight_{sys}', subdf[f'weight_{sys}'].sum()/theory_total_weight[f'weight_{sys}']])
+        dict_.append([f'weight_{sys}', subdf[f'weight_{sys}'].sum()/theory_total_weight[f'weight_{sys}_{whichcat_deep}']])
       for UpDown in ['Up', 'Down']:
         for sys in sfUnc:
           dict_.append([f'weight_{sys}_{UpDown}', subdf[f'weight_{sys}_{UpDown}'].sum()])

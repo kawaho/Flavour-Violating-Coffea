@@ -1,5 +1,4 @@
 unset PYTHONPATH
-voms-proxy-init --rfc --voms cms -valid 192:00
 while true; do
   read -p "Which setup? (local/remote): " setup
   case $setup in
@@ -12,6 +11,7 @@ while true; do
     remote)
       echo "-------------Setting up $setup virtual env-------------"
       conda activate  remote-coffea-env
+      voms-proxy-init --rfc --voms cms -valid 192:00
       echo "-------------          Done            -------------"
       break
       ;;
