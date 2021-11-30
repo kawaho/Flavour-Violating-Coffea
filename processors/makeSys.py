@@ -4,7 +4,7 @@ from coffea.lookup_tools import extractor
 from coffea.btag_tools import BTagScaleFactor
 import xgboost as xgb
 import awkward as ak
-import numpy, json, os
+import correctionlib, numpy, json, os
 
 def pZeta(leg1, leg2, MET_px, MET_py):
     leg1x = numpy.cos(leg1.phi)
@@ -198,13 +198,21 @@ class MyEMuPeak(processor.ProcessorABC):
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
 
-        massRange = (emVar.mass<160) & (emVar.mass>110)
+        massRange = (emVar.mass<160) & (emVar.mass>100)
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def SF(self, emevents):
         #Get bTag SF
-        btagSF_deepjet_L = self._btag_sf.eval("central", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
-        bTagSF = ak.prod(1-btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
+        jet_flat = ak.flatten(emevents.Jet)
+        btagSF_deepjet_L = numpy.zeros(len(jet_flat))
+        jet_light = ak.where((jet_flat.passDeepJet_L) & (jet_flat.hadronFlavour==0))
+        jet_heavy = ak.where((jet_flat.passDeepJet_L) & (jet_flat.hadronFlavour!=0))
+        array_light = self._btag_sf["deepJet_incl"].evaluate("central", "L", jet_flat[jet_light].hadronFlavour.to_numpy(), abs(jet_flat[jet_light].eta).to_numpy(), jet_flat[jet_light].pt_nom.to_numpy())
+        array_heavy = self._btag_sf["deepJet_comb"].evaluate("central", "L", jet_flat[jet_heavy].hadronFlavour.to_numpy(), abs(jet_flat[jet_heavy].eta).to_numpy(), jet_flat[jet_heavy].pt_nom.to_numpy())
+        btagSF_deepjet_L[jet_light] = array_light
+        btagSF_deepjet_L[jet_heavy] = array_heavy
+        btagSF_deepjet_L = ak.unflatten(btagSF_deepjet_L, ak.num(emevents.Jet))
+        bTagSF = ak.prod(1-btagSF_deepjet_L, axis=1)
 
         SF = bTagSF*emevents.puWeight*emevents.genWeight
 
@@ -238,10 +246,25 @@ class MyEMuPeak(processor.ProcessorABC):
           emevents[f"weight_pf_{other_year}_Down"] = SF
 
 	#bTag Up/Down
-        btagSF_deepjet_L_down = self._btag_sf.eval("down", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
-        btagSF_deepjet_L_up = self._btag_sf.eval("up", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
-        bTagSF_Down = ak.prod(1-btagSF_deepjet_L_down*emevents.Jet.passDeepJet_L, axis=1)
-        bTagSF_Up = ak.prod(1-btagSF_deepjet_L_up*emevents.Jet.passDeepJet_L, axis=1)
+        array_light_up = self._btag_sf["deepJet_incl"].evaluate("up_uncorrelated", "L", jet_flat[jet_light].hadronFlavour.to_numpy(), abs(jet_flat[jet_light].eta).to_numpy(), jet_flat[jet_light].pt_nom.to_numpy())
+        array_heavy_up = self._btag_sf["deepJet_comb"].evaluate("up_uncorrelated", "L", jet_flat[jet_heavy].hadronFlavour.to_numpy(), abs(jet_flat[jet_heavy].eta).to_numpy(), jet_flat[jet_heavy].pt_nom.to_numpy())
+        array_light_down = self._btag_sf["deepJet_incl"].evaluate("down_uncorrelated", "L", jet_flat[jet_light].hadronFlavour.to_numpy(), abs(jet_flat[jet_light].eta).to_numpy(), jet_flat[jet_light].pt_nom.to_numpy())
+        array_heavy_down = self._btag_sf["deepJet_comb"].evaluate("down_uncorrelated", "L", jet_flat[jet_heavy].hadronFlavour.to_numpy(), abs(jet_flat[jet_heavy].eta).to_numpy(), jet_flat[jet_heavy].pt_nom.to_numpy())
+
+        btagSF_deepjet_L_down = numpy.zeros(len(jet_flat))
+        btagSF_deepjet_L_up = numpy.zeros(len(jet_flat))
+
+        btagSF_deepjet_L_down[jet_heavy] = array_heavy_down
+        btagSF_deepjet_L_down[jet_light] = array_light_down
+
+        btagSF_deepjet_L_up[jet_heavy] = array_heavy_up
+        btagSF_deepjet_L_up[jet_light] = array_light_up
+
+        btagSF_deepjet_L_down = ak.unflatten(btagSF_deepjet_L_down, ak.num(emevents.Jet))
+        btagSF_deepjet_L_up = ak.unflatten(btagSF_deepjet_L_up, ak.num(emevents.Jet))
+
+        bTagSF_Down = ak.prod(1-btagSF_deepjet_L_down, axis=1)
+        bTagSF_Up = ak.prod(1-btagSF_deepjet_L_up, axis=1)
         emevents[f"weight_bTag_{self._year}_Up"] = SF*bTagSF_Up/bTagSF
         emevents[f"weight_bTag_{self._year}_Down"] = SF*bTagSF_Down/bTagSF
 
@@ -505,22 +528,19 @@ if __name__ == '__main__':
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2016HighPt.json"]
       if 'pre' in year:
         TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016preVFP_UL_trackerMuon.json"]
-        btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL16SF.csv", "LOOSE")
       else:
         TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016postVFP_UL_trackerMuon.json"]
-        btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL16SF.csv", "LOOSE")
          
     elif '2017' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2017.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2017.root"]
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2017_UL_trackerMuon.json"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2017HighPt.json"]
-      btag_sf = BTagScaleFactor("Corrections/bTag/DeepCSV_106XUL17SF_WPonly_V2p1.csv", "LOOSE")
     elif '2018' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_closureOS Corrections/QCD/em_qcd_osss_2018.root", "hist_em_qcd_osss_os_corr hist_em_qcd_extrap_uncert Corrections/QCD/em_qcd_osss_2018.root"]
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2018_UL_trackerMuon.json"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2018HighPt.json"]
-      btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL18SF_WPonly_V1p1.csv", "LOOSE")
 
+    btag_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/BTV/{year}_UL/btagging.json.gz")
     ext = extractor()
     ext.add_weight_sets(QCDhist)
     ext.add_weight_sets(TrackerMu)

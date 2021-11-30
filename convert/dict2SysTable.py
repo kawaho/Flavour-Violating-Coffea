@@ -54,7 +54,7 @@ df_ggcat, df_vbfcat = df[(df['isVBFcat']==0)], df[(df['isVBFcat']==1)]
 var_dict_data = {}
 for year in years:
   print(f'Processing {year}')
-  result = load(f"results/{year}/makeData/output_test.coffea")
+  result = load(f"results/{year}/makeData/output.coffea")
   if isinstance(result,tuple):
       result = result[0]
   for varName in result:
