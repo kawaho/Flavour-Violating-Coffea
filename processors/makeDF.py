@@ -48,8 +48,11 @@ def Zeppenfeld(lep1, lep2, jets):
     else:
         return -999
 
-def mT(lep, met):
-    return numpy.sqrt(abs((numpy.sqrt(lep.mass**2+lep.pt**2) + met.pt)**2 - (lep+met).pt**2))
+def mT(met, lep1, lep2=None):
+    if lep2==None:
+      return numpy.sqrt(abs((numpy.sqrt(lep1.mass**2+lep1.pt**2) + met.pt)**2 - (lep1+met).pt**2))
+    else:
+      return numpy.sqrt(abs((numpy.sqrt(lep1.mass**2+lep1.pt**2) + numpy.sqrt(lep2.mass**2+lep2.pt**2) + met.pt)**2 - (lep1+lep2+met).pt**2))
 
 def pt_cen(lep1, lep2, jets):
     emVar = lep1+lep2
@@ -68,7 +71,7 @@ class MyDF(processor.ProcessorABC):
         self._btag_sf = btag_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "eIso", "mEta", "mIso", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "eIso", "mEta", "mIso", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "e_m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaPhi_j1_em", "DeltaR_j1_em", "Zeppenfeld_1", "Rpt_1", "j1btagDeepFlavB"]
         self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaPhi_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaPhi_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaPhi_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "absZeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "abspt_cen_Deltapt", "Ht_had", "Ht", "j2btagDeepFlavB"]
         for var in self.var_ :
@@ -285,10 +288,12 @@ class MyDF(processor.ProcessorABC):
 
         emevents["met"] = MET_collections.pt
 
-        emevents["e_met_mT"] = mT(Electron_collections, MET_collections)
-        emevents["m_met_mT"] = mT(Muon_collections, MET_collections)
+        emevents["e_met_mT"] = mT(MET_collections, Electron_collections)
+        emevents["m_met_mT"] = mT(MET_collections, Muon_collections)
+        emevents["e_m_met_mT"] = mT(MET_collections, Electron_collections, Muon_collections)
         emevents["e_met_mT_Per_e_m_Mass"] = emevents["e_met_mT"]/emevents["e_m_Mass"]
         emevents["m_met_mT_Per_e_m_Mass"] = emevents["m_met_mT"]/emevents["e_m_Mass"]
+        emevents["e_m_met_mT_Per_e_m_Mass"] = emevents["e_m_met_mT"]/emevents["e_m_Mass"]
 
         pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
         emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_

@@ -83,6 +83,7 @@ class MyEMuPeak(processor.ProcessorABC):
         self._accumulator[f'e_m_Mass'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'isVBFcat'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'isVBF'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'isHerwig'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'nJet30'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'is2016'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'is2017'] = processor.column_accumulator(numpy.array([]))
@@ -295,10 +296,14 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents["is2016"] = numpy.ones(len(emevents)) if '2016' in self._year else numpy.zeros(len(emevents))
         emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))
         emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
-        if 'VBF' in emevents.metadata["dataset"]:
+        if ('VBF' in emevents.metadata["dataset"]) and (not 'herwig' in emevents.metadata["dataset"]):
           emevents["isVBF"] = numpy.ones(len(emevents)) 
         else:
           emevents["isVBF"] = numpy.zeros(len(emevents)) 
+        if 'herwig' in emevents.metadata["dataset"]:
+          emevents["isHerwig"] = numpy.ones(len(emevents)) 
+        else:
+          emevents["isHerwig"] = numpy.zeros(len(emevents)) 
         emVar = Electron_collections + Muon_collections
         emevents["e_m_Mass"] = emVar.mass
         emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emVar.mass

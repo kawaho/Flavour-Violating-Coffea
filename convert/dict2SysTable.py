@@ -48,7 +48,8 @@ for i in range(103):
   theory_total_weight[f"weight_lhe{i}_VBF"] = df[(df['isVBF']==1)][f"weight_lhe{i}"].sum()
 
 #Separate into two dataframe: one for VBF cat and GG cat
-df_ggcat, df_vbfcat = df[(df['isVBFcat']==0)], df[(df['isVBFcat']==1)]
+df_ggcat, df_vbfcat = df[(df['isVBFcat']==0)&(df['isHerwig']==0)], df[(df['isVBFcat']==1)&(df['isHerwig']==0)]
+#df_ggcat_herwig, df_vbfcat_herwig = df[(df['isVBFcat']==0)&(df['isHerwig']==1)], df[(df['isVBFcat']==1)&(df['isHerwig']==1)]
 
 #Repeat for data
 var_dict_data = {}
@@ -122,7 +123,13 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
       dict_.append(["weight2017", subdf[subdf["is2017"]==1]["weight"].sum()])
       dict_.append(["weight2018", subdf[subdf["is2018"]==1]["weight"].sum()])
       dict_.append(['acc', subdf['weight'].sum()/theory_total_weight[f'weight_{whichcat_deep}']])
-    
+#      if whichcat_deep=='VBF':
+#        if whichcat=='VBFcat':
+#          df_herwig = df_vbfcat_herwig
+#        else:
+#          df_herwig = df_ggcat_herwig
+#        subdf = df_herwig[(df_herwig[f'mva']<quantiles[i+1])&(df_herwig[f'mva']>=quantiles[i])]
+#        dict_.append([f'weight_herwig', subdf[f'weight'].sum()])
       for sys in theoUnc:
         dict_.append([f'weight_{sys}', subdf[f'weight_{sys}'].sum()/theory_total_weight[f'weight_{sys}_{whichcat_deep}']])
       for UpDown in ['Up', 'Down']:
