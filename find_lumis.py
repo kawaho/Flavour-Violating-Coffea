@@ -1,4 +1,4 @@
-import os, glob, json, uproot
+import os, glob, json, re, uproot
 
 datadefs = {}
 
@@ -87,14 +87,15 @@ def mclumi(sample):
   return -1, -1
 
 if __name__ == '__main__':
-  datalumis = {'2016preVFP': 36330, '2016postVFP': 36330, '2017': 41476.1, '2018': 59811.9}
+  datalumis = {'2016preVFP': 36330, '2016postVFP': 36330, '2017': 41476.1, '2018': 59817.3}
   year = '2018'
   if True: #for year in datalumis:
-    samples_names = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'_v1p2/*')
+    samples_names = glob.glob('/hadoop/store/user/kaho/NanoPost_'+year+'_v1p3/*')
+    print(samples_names)
     sample_paths = {}
     lumiWeight = {}
     for name in samples_names:
-       if 'SingleMuon' in name: continue
+       if 'SingleMuon' in name or 'tmp' in name: continue
        sample_basename = os.path.basename(name)
        sample_paths[sample_basename] = glob.glob(name+'/*/*/*/*root')
        lumiWeight[mclumi(sample_basename)[0]] = 0
@@ -103,7 +104,7 @@ if __name__ == '__main__':
          lumiWeight[mclumi(sample_basename)[0]]+=sum(runTree['genEventSumw']) 
   
     for sample_basename in lumiWeight:
-      if ('DY' in sample_basename and not '10to50' in sample_basename) or ('WJ' in sample_basename): 
+      if ('DY' in sample_basename and not '10to50' in sample_basename) or (re.match(re.compile('W.Jet'), sample_basename)): 
         lumiWeight[sample_basename] = lumiWeight[sample_basename]/(mclumi(sample_basename)[1])
         if sample_basename=="DYJetsToLL_M-50":
           dyLumi = lumiWeight[sample_basename]
@@ -120,7 +121,7 @@ if __name__ == '__main__':
         lumiWeight[sample_basename] = DYNNLO*datalumis[year]/(lumiWeight[sample_basename]+dyLumi)
       elif "WJetsToLNu_TuneCP5" in sample_basename: 
         lumiWeight[sample_basename] = WNNLO*datalumis[year]/wLumi
-      elif "JetsToLNu" in sample_basename: 
+      elif re.match(re.compile('W.Jet'), sample_basename): 
         lumiWeight[sample_basename] = WNNLO*datalumis[year]/(lumiWeight[sample_basename]+wLumi) 
 
     with open('lumi_'+year+'.json', 'w') as f: 
