@@ -10,6 +10,7 @@ conda create --name my-coffea-env
 conda activate my-coffea-env
 conda install -c conda-forge coffea xrootd ndcctools dill conda-pack xgboost scikit-learn root 
 conda install -c anaconda ipykernel
+conda-pack --output my-coffea-env.tar.gz
 ```
 To minimize size of the tarball to be sent to the remote workers for batch jobs, create another env named  ```remote-coffea-env``` and skip ```scikit-learn root``` as well as ```ipykernel```. After setting up the first time, just do 
 ```bash
