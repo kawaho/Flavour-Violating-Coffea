@@ -45,10 +45,18 @@ samples_to_run = {'makeHist': ['GluGlu_LFV_HToEMu']}
 ```
 
 ## Running Processors
-See options with `run_processor.py -h` to specify the processor to run, the executor (WQ or local only futures_executor) to be used as well as the option to add a subfix for the output file. Results will be stored in `./results/{year}/{processor name}/*.coffea`.
+See options with `run_processor.py -h` to specify the processor to run, the executor (WQ or local only futures_executor) to be used as well as the option to add a subfix for the output file. Results will be stored in `./results/{year}/{processor name}/*.coffea`. 
 
 ### Work Queue
-To use WQ executor, do `python run_processor.py --options` in one terminal and do `work_queue_factory -Tcondor -C my-conf.json` in another. Modify `my-conf.json` to change job parameters.
+To use WQ executor, do `python run_processor.py --options` in one terminal and do `work_queue_factory -Tcondor -C my-conf.json` in another. Modify `my-conf.json` to change job parameters. To keep running in the background, do double ssh with screen:
+```bash
+screen ssh $USER@$HOSTNAME
+```
+and then do 
+```bash
+screen -ls
+```
+to list all 'screens'.
 
 # Format Convesions
 It is often useful to convert outputs of coffea to more familiar formats, e.g. csv or ROOT files
