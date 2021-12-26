@@ -38,9 +38,9 @@ def collapse_ranges_in_list(xs):
     yield output
 
 if __name__ == '__main__':
-  years = ['2018']
+  years = ['2016preVFP', '2016postVFP', '2017', '2018']
   for year in years:
-    samples_era = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'_v1p2/SingleMuon/*')
+    samples_era = glob.glob('/hdfs/store/user/kaho/NanoPost_'+year+'_v2/SingleMuon/*')
     sample_paths = {}
     for name in samples_era:
        sample_basename = os.path.basename(name)
