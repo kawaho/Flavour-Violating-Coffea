@@ -4,7 +4,23 @@ from coffea.lookup_tools import extractor
 #old btag
 #from coffea.btag_tools import BTagScaleFactor
 import awkward as ak
-import correctionlib, numpy, json, os, sys
+import numba, correctionlib, numpy, json, os, sys
+
+@numba.njit
+def bTagSF_fast(bTagSF, btagSF_deepjet, nbtag):
+    for i in range(len(nbtag)):
+        if (nbtag[i]) >= 2:
+            acc_hi=0
+            for j in range(len(btagSF_deepjet[i])-1):
+                acc=btagSF_deepjet[i][j]
+                for k in range(j+1, len(btagSF_deepjet[i])):
+                    acc*=btagSF_deepjet[i][k]
+                    for z in range(len(btagSF_deepjet[i])):
+                        if z!=j and z!=k:
+                            acc*=(1-btagSF_deepjet[i][z])
+                    acc_hi+=acc
+                    acc=btagSF_deepjet[i][j]
+            bTagSF[i]=acc_hi
 
 def pZeta(leg1, leg2, MET_px, MET_py):
     leg1x = numpy.cos(leg1.phi)
@@ -73,7 +89,7 @@ class MyDF(processor.ProcessorABC):
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "eIso", "mEta", "mIso", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "e_m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "eIso", "mEta", "mIso", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "e_m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaPhi_j1_em", "DeltaR_j1_em", "Zeppenfeld_1", "Rpt_1", "j1btagDeepFlavB"]
         self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaPhi_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaPhi_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaPhi_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "absZeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "abspt_cen_Deltapt", "Ht_had", "Ht", "j2btagDeepFlavB"]
         for var in self.var_ :
@@ -191,7 +207,7 @@ class MyDF(processor.ProcessorABC):
         Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
           
         if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
-          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==0 #numpy.ones(len(emevents))
+          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==2 #numpy.ones(len(emevents))
         else:
           #Get bTag SF
           #old btag
@@ -205,7 +221,9 @@ class MyDF(processor.ProcessorABC):
           btagSF_deepjet_L[jet_light] = array_light
           btagSF_deepjet_L[jet_heavy] = array_heavy
           btagSF_deepjet_L = ak.unflatten(btagSF_deepjet_L, ak.num(emevents.Jet))
-          bTagSF = ak.prod(1-btagSF_deepjet_L, axis=1)
+          nbtag = ak.sum(emevents.Jet.passDeepJet_L,-1)
+          bTagSF = numpy.zeros(len(nbtag))
+          bTagSF_fast(bTagSF, btagSF_deepjet_L, nbtag)
  
           #bTag/PU/Gen Weights
           SF = bTagSF*emevents.puWeight*emevents.genWeight
@@ -305,6 +323,8 @@ class MyDF(processor.ProcessorABC):
 
         emevents["met"] = MET_collections.pt
 
+        emevents["DeltaPhi_e_met"] = Electron_collections.delta_phi(MET_collections)
+        emevents["DeltaPhi_m_met"] = Muon_collections.delta_phi(MET_collections)
         emevents["e_met_mT"] = mT(MET_collections, Electron_collections)
         emevents["m_met_mT"] = mT(MET_collections, Muon_collections)
         emevents["e_m_met_mT"] = mT3(MET_collections, Electron_collections, Muon_collections)
