@@ -374,7 +374,8 @@ class MyDF(processor.ProcessorABC):
           emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
           emevents = self.SF(emevents)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
-          emevents = emevents[ (emevents["DeltaPhi_e_m"]<2.6) & (emevents["met"]>50) & (emevents["DeltaPhi_e_met"]>1) & (emevents["DeltaPhi_m_met"]>1)]
+          emevents = emevents[(emevents["DeltaPhi_e_met"]>.5) & (emevents["DeltaPhi_m_met"]>.5)]
+          #emevents = emevents[ (emevents["DeltaPhi_e_m"]<2.6) & (emevents["met"]>50) & (emevents["DeltaPhi_e_met"]>1) & (emevents["DeltaPhi_m_met"]>1)]
           for var in self.var_ :
               out[var+'_0jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 0][var].to_numpy() ) )
               out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )

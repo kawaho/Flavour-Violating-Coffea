@@ -52,7 +52,8 @@ def mT(met, lep1):
     return numpy.sqrt(abs((numpy.sqrt(lep1.mass**2+lep1.pt**2) + met.pt)**2 - (lep1+met).pt**2))
 
 def mT3(met, lep1, lep2):
-  return numpy.sqrt(abs((numpy.sqrt(lep1.mass**2+lep1.pt**2) + numpy.sqrt(lep2.mass**2+lep2.pt**2) + met.pt)**2 - (lep1+lep2+met).pt**2))
+    lep12 = lep1+lep2
+    return numpy.sqrt(abs((numpy.sqrt(lep12.mass**2+lep12.pt**2) + met.pt)**2 - (lep12+met).pt**2))
 
 def pt_cen(lep1, lep2, jets):
     emVar = lep1+lep2
@@ -73,9 +74,9 @@ class MyDF(processor.ProcessorABC):
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "eIso", "mEta", "mIso", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaR_e_m", "Rpt_0", "e_met_mT", "m_met_mT", "e_m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "e_m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
-        self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaPhi_j1_em", "DeltaR_j1_em", "Zeppenfeld_1", "Rpt_1", "j1btagDeepFlavB"]
-        self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaPhi_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaPhi_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaPhi_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "absZeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "abspt_cen_Deltapt", "Ht_had", "Ht", "j2btagDeepFlavB"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "e_met_mT", "m_met_mT", "e_m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "e_m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met"]
+        self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaR_j1_em"]
+        self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "Ht_had"]
         for var in self.var_ :
             self._accumulator[var+'_0jets'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[var+'_1jets'] = processor.column_accumulator(numpy.array([]))
@@ -288,22 +289,46 @@ class MyDF(processor.ProcessorABC):
         #make interesting variables
         emevents["sample"] = numpy.repeat(self._samples.index(emevents.metadata["dataset"]), len(emevents))
         emevents["njets"] = emevents.nJet30
+        emevents["e_m_Mass"] = (Electron_collections + Muon_collections).mass
+#        Electron_collections = ak.zip(
+#    	{
+#          "pt":   Electron_collections.pt,
+#          "eta":  Electron_collections.eta,
+#          "phi":  Electron_collections.phi,
+#          "mass": Electron_collections.mass,
+#        },
+#          with_name="PtEtaPhiMLorentzVector",
+#        )
+#        Muon_collections = ak.zip(
+#    	{
+#          "pt":   Muon_collections.pt,
+#          "eta":  Muon_collections.eta,
+#          "phi":  Muon_collections.phi,
+#          "mass": Muon_collections.mass,
+#        },
+#          with_name="PtEtaPhiMLorentzVector",
+#        )
+#        Electron_collections=Electron_collections/emevents["e_m_Mass"] 
+#        Muon_collections=Muon_collections/emevents["e_m_Mass"] 
         emVar = Electron_collections + Muon_collections
         emevents["eEta"] = Electron_collections.eta
-        emevents["eIso"] = Electron_collections.pfRelIso03_all
         emevents["mEta"] = Muon_collections.eta
-        emevents["mIso"] = Muon_collections.pfRelIso04_all
-        emevents["e_m_Mass"] = emVar.mass
+#        emevents["ePhi"] = Electron_collections.phi
+#        emevents["mPhi"] = Muon_collections.phi
+        #emevents["eIso"] = Electron_collections.pfRelIso03_all
+        #emevents["mIso"] = Muon_collections.pfRelIso04_all
         emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emevents["e_m_Mass"]
         emevents["ept_Per_e_m_Mass"] = Electron_collections.pt/emevents["e_m_Mass"]
         emevents["empt"] = emVar.pt
         emevents["emEta"] = emVar.eta
+#        emevents["emPhi"] = emVar.phi
         emevents["DeltaEta_e_m"] = abs(Muon_collections.eta - Electron_collections.eta)
-        emevents["DeltaPhi_e_m"] = Muon_collections.delta_phi(Electron_collections)
+#        emevents["DeltaPhi_e_m"] = Muon_collections.delta_phi(Electron_collections)
         emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
-        emevents["Rpt_0"] = Rpt(Muon_collections, Electron_collections)
+#        emevents["Rpt_0"] = Rpt(Muon_collections, Electron_collections)
 
         emevents["met"] = MET_collections.pt
+#        emevents["metPhi"] = MET_collections.phi
 
         emevents["e_met_mT"] = mT(MET_collections, Electron_collections)
         emevents["m_met_mT"] = mT(MET_collections, Muon_collections)
@@ -311,6 +336,9 @@ class MyDF(processor.ProcessorABC):
         emevents["e_met_mT_Per_e_m_Mass"] = emevents["e_met_mT"]/emevents["e_m_Mass"]
         emevents["m_met_mT_Per_e_m_Mass"] = emevents["m_met_mT"]/emevents["e_m_Mass"]
         emevents["e_m_met_mT_Per_e_m_Mass"] = emevents["e_m_met_mT"]/emevents["e_m_Mass"]
+        emevents["DeltaPhi_e_met"] = Electron_collections.delta_phi(MET_collections)
+        emevents["DeltaPhi_m_met"] = Muon_collections.delta_phi(MET_collections)
+        emevents["DeltaPhi_em_met"] = emVar.delta_phi(MET_collections)
 
         pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
         emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
@@ -322,46 +350,46 @@ class MyDF(processor.ProcessorABC):
         emevents['j1Eta'] = Jet_collections[:,0].eta
 
         emevents["DeltaEta_j1_em"] = abs(Jet_collections[:,0].eta - emVar.eta)
-        emevents["DeltaPhi_j1_em"] = Jet_collections[:,0].delta_phi(emVar)
+#        emevents["DeltaPhi_j1_em"] = Jet_collections[:,0].delta_phi(emVar)
         emevents["DeltaR_j1_em"] = Jet_collections[:,0].delta_r(emVar)
 
-        emevents["Zeppenfeld_1"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0]])
-        emevents["Rpt_1"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0]])
-        emevents["j1btagDeepFlavB"] = Jet_collections[:,0].btagDeepFlavB
+#        emevents["Zeppenfeld_1"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0]])
+#        emevents["Rpt_1"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0]])
+#        emevents["j1btagDeepFlavB"] = Jet_collections[:,0].btagDeepFlavB
 
         emevents['j2pt'] = Jet_collections[:,1].pt
         emevents['j2Eta'] = Jet_collections[:,1].eta
         emevents["j1_j2_mass"] = (Jet_collections[:,0] + Jet_collections[:,1]).mass
 
         emevents["DeltaEta_em_j1j2"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - emVar.eta)
-        emevents["DeltaPhi_em_j1j2"] = (Jet_collections[:,0] + Jet_collections[:,1]).delta_phi(emVar)
+#        emevents["DeltaPhi_em_j1j2"] = (Jet_collections[:,0] + Jet_collections[:,1]).delta_phi(emVar)
         emevents["DeltaR_em_j1j2"] = (Jet_collections[:,0] + Jet_collections[:,1]).delta_r(emVar)
 
         emevents["DeltaEta_j2_em"] = abs(Jet_collections[:,1].eta - emVar.eta)
-        emevents["DeltaPhi_j2_em"] = Jet_collections[:,1].delta_phi(emVar)
+#        emevents["DeltaPhi_j2_em"] = Jet_collections[:,1].delta_phi(emVar)
         emevents["DeltaR_j2_em"] = Jet_collections[:,1].delta_r(emVar)
 
         emevents["DeltaEta_j1_j2"] = abs(Jet_collections[:,0].eta - Jet_collections[:,1].eta)
 
         emevents["isVBFcat"] = ((emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5))
 
-        emevents["DeltaPhi_j1_j2"] = Jet_collections[:,0].delta_phi(Jet_collections[:,1])
+#        emevents["DeltaPhi_j1_j2"] = Jet_collections[:,0].delta_phi(Jet_collections[:,1])
         emevents["DeltaR_j1_j2"] = Jet_collections[:,0].delta_r(Jet_collections[:,1])
 
         emevents["Zeppenfeld"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
         emevents["Zeppenfeld_DeltaEta"] = emevents["Zeppenfeld"]/emevents["DeltaEta_j1_j2"]
-        emevents["absZeppenfeld_DeltaEta"] = abs(emevents["Zeppenfeld_DeltaEta"])
+#        emevents["absZeppenfeld_DeltaEta"] = abs(emevents["Zeppenfeld_DeltaEta"])
         emevents["cen"] = numpy.exp(-4*emevents["Zeppenfeld_DeltaEta"]**2)
 
         emevents["Rpt"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
 
         emevents["pt_cen"] = pt_cen(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
         emevents["pt_cen_Deltapt"] = emevents["pt_cen"]/(Jet_collections[:,0] - Jet_collections[:,1]).pt
-        emevents["abspt_cen_Deltapt"] = abs(emevents["pt_cen_Deltapt"])
-        emevents["Ht"] = ak.sum(Jet_collections.pt, 1) + Muon_collections.pt + Electron_collections.pt
+#        emevents["abspt_cen_Deltapt"] = abs(emevents["pt_cen_Deltapt"])
+#        emevents["Ht"] = ak.sum(Jet_collections.pt, 1) + Muon_collections.pt + Electron_collections.pt
         emevents["Ht_had"] = ak.sum(Jet_collections.pt, 1)
 
-        emevents["j2btagDeepFlavB"] = Jet_collections[:,1].btagDeepFlavB
+        #emevents["j2btagDeepFlavB"] = Jet_collections[:,1].btagDeepFlavB
         return emevents
 
     # we will receive a NanoEvents instead of a coffea DataFrame
