@@ -68,7 +68,8 @@ def mT(met, lep1):
     return numpy.sqrt(abs((numpy.sqrt(lep1.mass**2+lep1.pt**2) + met.pt)**2 - (lep1+met).pt**2))
 
 def mT3(met, lep1, lep2):
-  return numpy.sqrt(abs((numpy.sqrt(lep1.mass**2+lep1.pt**2) + numpy.sqrt(lep2.mass**2+lep2.pt**2) + met.pt)**2 - (lep1+lep2+met).pt**2))
+    lep12 = lep1+lep2
+    return numpy.sqrt(abs((numpy.sqrt(lep12.mass**2+lep12.pt**2) + met.pt)**2 - (lep12+met).pt**2))
 
 def pt_cen(lep1, lep2, jets):
     emVar = lep1+lep2
@@ -89,7 +90,7 @@ class MyDF(processor.ProcessorABC):
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "eIso", "mEta", "mIso", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaR_e_m", "e_met_mT", "m_met_mT", "e_m_met_mT", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaPhi_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met", "DeltaR_e_m", "e_met_mT", "m_met_mT", "e_m_met_mT", "pZeta85", "pZeta15", "pZeta", "pZetaVis"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaPhi_j1_em", "DeltaR_j1_em"]
         self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaPhi_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaPhi_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaPhi_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "Ht_had", "Ht"]
         for var in self.var_ :
@@ -325,6 +326,7 @@ class MyDF(processor.ProcessorABC):
 
         emevents["DeltaPhi_e_met"] = Electron_collections.delta_phi(MET_collections)
         emevents["DeltaPhi_m_met"] = Muon_collections.delta_phi(MET_collections)
+        emevents["DeltaPhi_em_met"] = emVar.delta_phi(MET_collections)
         emevents["e_met_mT"] = mT(MET_collections, Electron_collections)
         emevents["m_met_mT"] = mT(MET_collections, Muon_collections)
         emevents["e_m_met_mT"] = mT3(MET_collections, Electron_collections, Muon_collections)

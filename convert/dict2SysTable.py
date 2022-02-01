@@ -22,7 +22,7 @@ years = ['2016preVFP', '2016postVFP', '2017', '2018']
 var_dict = {}
 for year in years:
   print(f'Processing {year}')
-  result = load(f"results/{year}/makeSys/output_test.coffea")
+  result = load(f"results/{year}/makeSys/output.coffea")
   if isinstance(result,tuple):
       result = result[0]
   for varName in result:
@@ -35,11 +35,11 @@ for year in years:
 theory_total_weight = {}
 df = pd.DataFrame(var_dict)
 
-theory_total_weight["weight_GG"] = df[(df['isVBF']==0)]["weight"].sum()
-theory_total_weight["weight_scalep5p5_GG"] = df[(df['isVBF']==0)]["weight_scalep5p5"].sum()
-theory_total_weight["weight_scale22_GG"] = df[(df['isVBF']==0)]["weight_scale22"].sum()
+theory_total_weight["weight_GG"] = df[(df['isVBF']==0)&(df['isHerwig']==0)]["weight"].sum()
+theory_total_weight["weight_scalep5p5_GG"] = df[(df['isVBF']==0)&(df['isHerwig']==0)]["weight_scalep5p5"].sum()
+theory_total_weight["weight_scale22_GG"] = df[(df['isVBF']==0)&(df['isHerwig']==0)]["weight_scale22"].sum()
 for i in range(103):
-  theory_total_weight[f"weight_lhe{i}_GG"] = df[(df['isVBF']==0)][f"weight_lhe{i}"].sum()
+  theory_total_weight[f"weight_lhe{i}_GG"] = df[(df['isVBF']==0)&(df['isHerwig']==0)][f"weight_lhe{i}"].sum()
 
 theory_total_weight["weight_VBF"] = df[(df['isVBF']==1)]["weight"].sum()
 theory_total_weight["weight_scalep5p5_VBF"] = df[(df['isVBF']==1)]["weight_scalep5p5"].sum()
@@ -142,14 +142,14 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
         for sys in jetUnc+jetyearUnc:
           if whichcat=='GGcat':
             if whichcat_deep=='GG':
-              df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==0) & (df[f'isVBF']==0)] 
+              df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==0) & (df[f'isVBF']==0) & (df['isHerwig']==0)] 
             else:
-              df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==0) & (df[f'isVBF']==1)]
+              df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==0) & (df[f'isVBF']==1) & (df['isHerwig']==0)]
           else: 
             if whichcat_deep=='GG':
-              df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==1) & (df[f'isVBF']==0)] 
+              df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==1) & (df[f'isVBF']==0) & (df['isHerwig']==0)] 
             else:
-              df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==1) & (df[f'isVBF']==1)]
+              df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==1) & (df[f'isVBF']==1) & (df['isHerwig']==0)]
     
           subdf = df_gg_vbf_deep_sys[(df_gg_vbf_deep_sys[f'mva_{sys}_{UpDown}']<quantiles[i+1])&(df_gg_vbf_deep_sys[f'mva_{sys}_{UpDown}']>=quantiles[i])]
           dict_.append([f'weight_{sys}_{UpDown}', subdf[f'weight'].sum()])

@@ -166,15 +166,16 @@ class MyEMuPeak(processor.ProcessorABC):
     def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
         emVar = Electron_collections + Muon_collections
         emevents["e_m_Mass"] = emVar.mass
-        emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emVar.mass
-        emevents["ept_Per_e_m_Mass"] = Electron_collections.pt/emVar.mass
+        #emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emVar.mass
+        #emevents["ept_Per_e_m_Mass"] = Electron_collections.pt/emVar.mass
         emevents["empt"] = emVar.pt
         emevents["DeltaEta_e_m"] = abs(Muon_collections.eta - Electron_collections.eta)
         emevents["met"] = MET_collections.pt
-        emevents["e_met_mT"] = mT(Electron_collections, MET_collections)
-        emevents["m_met_mT"] = mT(Muon_collections, MET_collections)
-        pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
-        emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
+        emevents["DeltaPhi_em_met"] = emVar.delta_phi(MET_collections)
+        #emevents["e_met_mT"] = mT(Electron_collections, MET_collections)
+        #emevents["m_met_mT"] = mT(Muon_collections, MET_collections)
+        #pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
+        #emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
         #1 jet
         emevents['j1pt'] = Jet_collections[:,0].pt
         emevents['j1Eta'] = Jet_collections[:,0].eta
