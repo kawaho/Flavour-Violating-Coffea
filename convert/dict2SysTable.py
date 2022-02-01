@@ -73,14 +73,14 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
   wq = DescrStatsW(data=df_gg_vbf['mva'], weights=df_gg_vbf['weight'])
   quantiles = wq.quantile(probs=np.linspace(0,1,101), return_pandas=False)
   quantiles[0], quantiles[-1] = 0, 1
-  quantiles.dump(f"results/{whichcat}_quantiles")
+  quantiles.dump(f"results/SenScan/{whichcat}_quantiles")
   #with open(f"{whichcat}_quantiles.json", 'w') as f:
   #  json.dump(quantiles, f, indent=2) 
   #Create tree for mva/weight/e_m_Mass
   datasets = []
   e_m_Mass = df_gg_vbf_data[f'e_m_Mass'].to_numpy()
   mva = df_gg_vbf_data['mva'].to_numpy()
-  with uproot3.recreate(f"results/{whichcat}_tree.root") as f:
+  with uproot3.recreate(f"results/SenScan/{whichcat}_tree.root") as f:
     f['tree'] = uproot3.newtree({'CMS_emu_Mass': e_m_Mass.dtype, 'mva': mva.dtype})
     f['tree'].extend({'CMS_emu_Mass': e_m_Mass, 'mva': mva})
 
@@ -106,7 +106,7 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
         uproot_tree_dict[f'CMS_emu_Mass_{sys}_{UpDown}'] = e_m_Mass_sys[-1]
         uproot_tree_dict_dtype[f'mva_{sys}_{UpDown}'] = mva_sys[-1].dtype
         uproot_tree_dict[f'mva_{sys}_{UpDown}'] = mva_sys[-1]
-    with uproot3.recreate(f"results/{whichcat_deep}_{whichcat}_tree.root") as f:
+    with uproot3.recreate(f"results/SenScan/{whichcat_deep}_{whichcat}_tree.root") as f:
       f['tree'] = uproot3.newtree(uproot_tree_dict_dtype)
       f['tree'].extend(uproot_tree_dict)
 
@@ -171,5 +171,5 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
     #output sys dataframe
     quan_df = pd.DataFrame(quan_dict)
     quan_df.sort_values(by='quantiles', inplace=True)
-    quan_df.set_index('quantiles').to_csv(f'results/{whichcat_deep}_{whichcat}.csv')    
+    quan_df.set_index('quantiles').to_csv(f'results/SenScan/{whichcat_deep}_{whichcat}.csv')    
     #quan_df.to_csv(f'results/{whichcat_deep}_{whichcat}.csv')    

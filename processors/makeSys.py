@@ -374,7 +374,7 @@ class MyEMuPeak(processor.ProcessorABC):
 #          emevents[f"ept_Per_e_m_Mass_me_{UpDown}"] = Electron_collections.pt/emevents[f'e_m_Mass_me_{UpDown}']
           emevents[f"empt_me_{UpDown}"] = tmpemVar.pt
           emevents[f"DeltaEta_e_m_me_{UpDown}"] = abs(tmpMuon_collections.eta - Electron_collections.eta)
-          emevents[f"m_met_mT_me_{UpDown}"] = mT(tmpMuon_collections, MET_collections)
+#          emevents[f"m_met_mT_me_{UpDown}"] = mT(tmpMuon_collections, MET_collections)
 #          pZeta_, pZetaVis_ = pZeta(tmpMuon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
 #          emevents[f"pZeta85_me_{UpDown}"] = pZeta_ - 0.85*pZetaVis_
           emevents["DeltaPhi_em_met_me_{UpDown}"] = tmpemVar.delta_phi(MET_collections)
@@ -402,25 +402,8 @@ class MyEMuPeak(processor.ProcessorABC):
           for jetUnc in self.jetUnc+self.jetyearUnc:
              jecYear = self._year[:4]
              if jetUnc in self.jetyearUnc and not jecYear in jetUnc:
-               #Make a copy of all Jet/MET var
-               emevents[f"nJet30_{jetUnc}_{UpDown}"] = emevents["nJet30"]
-               emevents[f"met_{jetUnc}_{UpDown}"] = emevents["met"]
-               emevents["DeltaPhi_em_met_{jetUnc}_{UpDown}"] = emevents["DeltaPhi_em_met"]
-#               emevents[f"e_met_mT_{jetUnc}_{UpDown}"] = emevents["e_met_mT"]
-#               emevents[f"m_met_mT_{jetUnc}_{UpDown}"] = emevents["m_met_mT"]
-#               emevents[f"pZeta85_{jetUnc}_{UpDown}"] = emevents["pZeta85"] 
-               emevents[f'j1pt_{jetUnc}_{UpDown}'] = emevents['j1pt']
-               emevents[f'j1Eta_{jetUnc}_{UpDown}'] = emevents['j1Eta']
-               emevents[f"DeltaEta_j1_em_{jetUnc}_{UpDown}"] = emevents["DeltaEta_j1_em"]
-               emevents[f'j2pt_{jetUnc}_{UpDown}'] = emevents['j2pt']
-               emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] = emevents["j1_j2_mass"]
-               emevents[f"DeltaEta_em_j1j2_{jetUnc}_{UpDown}"] = emevents["DeltaEta_em_j1j2"]
-               emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"] = emevents["DeltaEta_j1_j2"]
-               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = emevents["isVBFcat"]
-               emevents[f"Zeppenfeld_DeltaEta_{jetUnc}_{UpDown}"] = emevents["Zeppenfeld_DeltaEta"] 
-               emevents[f"Rpt_{jetUnc}_{UpDown}"] = emevents["Rpt"]
-               emevents[f"pt_cen_Deltapt_{jetUnc}_{UpDown}"] = emevents["pt_cen_Deltapt"]
-               emevents[f"Ht_had_{jetUnc}_{UpDown}"] = emevents["Ht_had"]
+             #ignore this year
+               continue
              else:
                if 'jer' in jetUnc: 
                  jetUncNoyear='jer'
