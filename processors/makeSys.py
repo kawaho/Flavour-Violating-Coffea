@@ -289,8 +289,8 @@ class MyEMuPeak(processor.ProcessorABC):
 
 	#Pre-firing Up/Down
         if self._year != '2018':
-          emevents[f"weight_pf_{self._year}_Up"] = SF*emevents.L1PreFiringWeight.Dn/emevents.L1PreFiringWeight.Nom
-          emevents[f"weight_pf_{self._year}_Down"] = SF*emevents.L1PreFiringWeight.Up/emevents.L1PreFiringWeight.Nom
+          emevents[f"weight_pf_{self._year}_Up"] = SF*emevents.L1PreFiringWeight.Up/emevents.L1PreFiringWeight.Nom
+          emevents[f"weight_pf_{self._year}_Down"] = SF*emevents.L1PreFiringWeight.Dn/emevents.L1PreFiringWeight.Nom
 
 	#Scale uncertainty
         emevents[f"weight_scalep5p5"] = SF*emevents.LHEScaleWeight[:,0]
@@ -402,8 +402,9 @@ class MyEMuPeak(processor.ProcessorABC):
           for jetUnc in self.jetUnc+self.jetyearUnc:
              jecYear = self._year[:4]
              if jetUnc in self.jetyearUnc and not jecYear in jetUnc:
-             #ignore this year
-               continue
+               #ignore this year
+               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = emevents["isVBFcat"] 
+               emevents[f"nJet30_{jetUnc}_{UpDown}"] = emevents["nJet30"]
              else:
                if 'jer' in jetUnc: 
                  jetUncNoyear='jer'

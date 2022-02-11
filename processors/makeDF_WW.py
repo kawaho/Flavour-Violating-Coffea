@@ -152,12 +152,8 @@ class MyDF(processor.ProcessorABC):
         Jet_collections['mass'] = Jet_collections['mass_nom']
 
         #MET corrections
-        if emevents.metadata["dataset"]!='SingleMuon' and emevents.metadata["dataset"]!='data':
-            MET_collections['phi'] = MET_collections['T1Smear_phi'] 
-            MET_collections['pt'] = MET_collections['T1Smear_pt'] 
-        else:
-            MET_collections['phi'] = MET_collections['T1_phi'] 
-            MET_collections['pt'] = MET_collections['T1_pt'] 
+        MET_collections['phi'] = MET_collections['T1_phi'] 
+        MET_collections['pt'] = MET_collections['T1_pt'] 
 
         ##MET corrections Electron
         #Electron_collections['pt'] = Electron_collections['pt']/Electron_collections['eCorr']

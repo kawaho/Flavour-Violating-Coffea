@@ -136,8 +136,8 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
         for sys in sfUnc:
           dict_.append([f'weight_{sys}_{UpDown}', subdf[f'weight_{sys}_{UpDown}'].sum()])
         for sys in leptonUnc+metUnc:
-          subdf = df_gg_vbf_deep[(df_gg_vbf_deep[f'mva_{sys}_{UpDown}']<quantiles[i+1])&(df_gg_vbf_deep[f'mva_{sys}_{UpDown}']>=quantiles[i])]
-          dict_.append([f'weight_{sys}_{UpDown}', subdf[f'weight'].sum()])
+          subdf_mva_unc = df_gg_vbf_deep[(df_gg_vbf_deep[f'mva_{sys}_{UpDown}']<quantiles[i+1])&(df_gg_vbf_deep[f'mva_{sys}_{UpDown}']>=quantiles[i])]
+          dict_.append([f'weight_{sys}_{UpDown}', subdf_mva_unc[f'weight'].sum()])
     
         for sys in jetUnc+jetyearUnc:
           if whichcat=='GGcat':
@@ -151,14 +151,14 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
             else:
               df_gg_vbf_deep_sys = df[(df[f'isVBFcat_{sys}_{UpDown}']==1) & (df[f'isVBF']==1) & (df['isHerwig']==0)]
     
-          subdf = df_gg_vbf_deep_sys[(df_gg_vbf_deep_sys[f'mva_{sys}_{UpDown}']<quantiles[i+1])&(df_gg_vbf_deep_sys[f'mva_{sys}_{UpDown}']>=quantiles[i])]
-          dict_.append([f'weight_{sys}_{UpDown}', subdf[f'weight'].sum()])
+          subdf_mva_unc = df_gg_vbf_deep_sys[(df_gg_vbf_deep_sys[f'mva_{sys}_{UpDown}']<quantiles[i+1])&(df_gg_vbf_deep_sys[f'mva_{sys}_{UpDown}']>=quantiles[i])]
+          dict_.append([f'weight_{sys}_{UpDown}', subdf_mva_unc[f'weight'].sum()])
       return dict_
 
 
     #for i in range(len(quantiles)-1):
     #  FillSys(i)
-    executor = concurrent.futures.ProcessPoolExecutor(32)
+    executor = concurrent.futures.ProcessPoolExecutor()#32)
     futures = [executor.submit(FillSys, i) 
            for i in range(len(quantiles)-1)]
     long_dict_ = []

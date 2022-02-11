@@ -74,7 +74,7 @@ class MyDF(processor.ProcessorABC):
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "e_met_mT", "m_met_mT", "e_m_met_mT", "e_met_mT_Per_e_m_Mass", "m_met_mT_Per_e_m_Mass", "e_m_met_mT_Per_e_m_Mass", "pZeta85", "pZeta15", "pZeta", "pZetaVis", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "e_m_Mass_reso", "e_m_Mass_ereso", "e_m_Mass_mreso", "lepCos", "e_deltaE", "m_deltapT", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaR_j1_em"]
         self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "Ht_had"]
         for var in self.var_ :
@@ -153,12 +153,8 @@ class MyDF(processor.ProcessorABC):
         Jet_collections['mass'] = Jet_collections['mass_nom']
 
         #MET corrections
-        if emevents.metadata["dataset"]!='SingleMuon' and emevents.metadata["dataset"]!='data':
-            MET_collections['phi'] = MET_collections['T1Smear_phi'] 
-            MET_collections['pt'] = MET_collections['T1Smear_pt'] 
-        else:
-            MET_collections['phi'] = MET_collections['T1_phi'] 
-            MET_collections['pt'] = MET_collections['T1_pt'] 
+        MET_collections['phi'] = MET_collections['T1_phi'] 
+        MET_collections['pt'] = MET_collections['T1_pt'] 
 
         ##MET corrections Electron
         #Electron_collections['pt'] = Electron_collections['pt']/Electron_collections['eCorr']
@@ -290,6 +286,12 @@ class MyDF(processor.ProcessorABC):
         emevents["sample"] = numpy.repeat(self._samples.index(emevents.metadata["dataset"]), len(emevents))
         emevents["njets"] = emevents.nJet30
         emevents["e_m_Mass"] = (Electron_collections + Muon_collections).mass
+        emevents["e_m_Mass_reso"] = numpy.sqrt( (Muon_collections.energy*Electron_collections.energyErr)**2+(Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt)**2 ) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
+        emevents["e_m_Mass_ereso"] = (Muon_collections.energy*Electron_collections.energyErr) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
+        emevents["e_m_Mass_mreso"] = (Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
+        emevents["lepCos"] = Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)
+        emevents["e_deltaE"] = Electron_collections.energyErr
+        emevents["m_deltapT"] = Muon_collections.ptErr
 #        Electron_collections = ak.zip(
 #    	{
 #          "pt":   Electron_collections.pt,
@@ -330,21 +332,21 @@ class MyDF(processor.ProcessorABC):
         emevents["met"] = MET_collections.pt
 #        emevents["metPhi"] = MET_collections.phi
 
-        emevents["e_met_mT"] = mT(MET_collections, Electron_collections)
-        emevents["m_met_mT"] = mT(MET_collections, Muon_collections)
-        emevents["e_m_met_mT"] = mT3(MET_collections, Electron_collections, Muon_collections)
-        emevents["e_met_mT_Per_e_m_Mass"] = emevents["e_met_mT"]/emevents["e_m_Mass"]
-        emevents["m_met_mT_Per_e_m_Mass"] = emevents["m_met_mT"]/emevents["e_m_Mass"]
-        emevents["e_m_met_mT_Per_e_m_Mass"] = emevents["e_m_met_mT"]/emevents["e_m_Mass"]
+        #emevents["e_met_mT"] = mT(MET_collections, Electron_collections)
+        #emevents["m_met_mT"] = mT(MET_collections, Muon_collections)
+        #emevents["e_m_met_mT"] = mT3(MET_collections, Electron_collections, Muon_collections)
+        #emevents["e_met_mT_Per_e_m_Mass"] = emevents["e_met_mT"]/emevents["e_m_Mass"]
+        #emevents["m_met_mT_Per_e_m_Mass"] = emevents["m_met_mT"]/emevents["e_m_Mass"]
+        #emevents["e_m_met_mT_Per_e_m_Mass"] = emevents["e_m_met_mT"]/emevents["e_m_Mass"]
         emevents["DeltaPhi_e_met"] = Electron_collections.delta_phi(MET_collections)
         emevents["DeltaPhi_m_met"] = Muon_collections.delta_phi(MET_collections)
         emevents["DeltaPhi_em_met"] = emVar.delta_phi(MET_collections)
 
-        pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
-        emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
-        emevents["pZeta15"] = pZeta_ - 1.5*pZetaVis_
-        emevents["pZeta"] = pZeta_
-        emevents["pZetaVis"] = pZetaVis_
+        #pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
+        #emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
+        #emevents["pZeta15"] = pZeta_ - 1.5*pZetaVis_
+        #emevents["pZeta"] = pZeta_
+        #emevents["pZetaVis"] = pZetaVis_
 
         emevents['j1pt'] = Jet_collections[:,0].pt
         emevents['j1Eta'] = Jet_collections[:,0].eta

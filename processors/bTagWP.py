@@ -1,39 +1,38 @@
 from coffea import processor, hist
 from coffea.util import save
 from coffea.lookup_tools import extractor
-from coffea.btag_tools import BTagScaleFactor
 import awkward as ak
-import numpy, json, os
+import correctionlib, numpy, json, os, sys
 
 class MyEMuPeak(processor.ProcessorABC):
-    def __init__(self, lumiWeight, year, btag_sf_L, btag_sf_M, btag_sf_T, evaluator):
+    def __init__(self, lumiWeight, year, btag_sf, muon_sf, electron_sf, evaluator):
         dataset_axis = hist.Cat("dataset", "samples")
         self._lumiWeight = lumiWeight
         self._year = year
-        self._btag_sf_L = btag_sf_L
-        self._btag_sf_M = btag_sf_M
-        self._btag_sf_T = btag_sf_T
+        self._btag_sf = btag_sf
+        self._e_sf = electron_sf
+        self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({
             'emMass': hist.Hist(
                 "Events",
                 dataset_axis,
-                hist.Bin("emMass", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
+                hist.Bin("emMass", r"$m^{e\mu}$ [GeV]", 200, 110, 160),
             ),
             'emMass_deepjet_L': hist.Hist(
                 "Events",
                 dataset_axis,
-                hist.Bin("emMass_deepjet_L", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
+                hist.Bin("emMass_deepjet_L", r"$m^{e\mu}$ [GeV]", 200, 110, 160),
             ),
             'emMass_deepjet_M': hist.Hist(
                 "Events",
                 dataset_axis,
-                hist.Bin("emMass_deepjet_M", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
+                hist.Bin("emMass_deepjet_M", r"$m^{e\mu}$ [GeV]", 200, 110, 160),
             ),
             'emMass_deepjet_T': hist.Hist(
                 "Events",
                 dataset_axis,
-                hist.Bin("emMass_deepjet_T", r"$m^{e\mu}$ [GeV]", 50, 110, 160),
+                hist.Bin("emMass_deepjet_T", r"$m^{e\mu}$ [GeV]", 200, 110, 160),
             )
 #            'emMass_deepcsv_L': hist.Hist(
 #                "Events",
@@ -102,6 +101,7 @@ class MyEMuPeak(processor.ProcessorABC):
         Muon_collections = emevents.Muon[emevents.Muon.Target==1]
 
         #Muon pT corrections
+        Muon_collections['mass'] = Muon_collections['mass']*Muon_collections['corrected_pt']/Muon_collections['pt']
         Muon_collections['pt'] = Muon_collections['corrected_pt']
 
         #Take the first leptons
@@ -109,9 +109,7 @@ class MyEMuPeak(processor.ProcessorABC):
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
 
-        if 'LFV' in emevents.metadata["dataset"]:
-            massRange = (emVar.mass<135) & (emVar.mass>115)
-        elif emevents.metadata["dataset"] == 'data':
+        if emevents.metadata["dataset"] == 'data':
             massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
         else:
             massRange = (emVar.mass<135) & (emVar.mass>115)
@@ -120,23 +118,44 @@ class MyEMuPeak(processor.ProcessorABC):
     def SF(self, emevents):
         if emevents.metadata["dataset"]=='data': return numpy.ones(len(emevents)), ak.sum(emevents.Jet.passDeepJet_L,1)==0, ak.sum(emevents.Jet.passDeepJet_M,1)==0, ak.sum(emevents.Jet.passDeepJet_T,1)==0#, ak.sum(emevents.Jet.passDeepCSV_L,1)==0, ak.sum(emevents.Jet.passDeepCSV_M,1)==0
         #Get bTag SF
-        btagSF_deepjet_L = self._btag_sf_L.eval("central", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
-        btagSF_deepjet_M = self._btag_sf_M.eval("central", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
-        btagSF_deepjet_T = self._btag_sf_T.eval("central", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
+        jet_flat = ak.flatten(emevents.Jet)
+        btagSF_deepjet_L = numpy.zeros(len(jet_flat))
+        btagSF_deepjet_M = numpy.zeros(len(jet_flat))
+        btagSF_deepjet_T = numpy.zeros(len(jet_flat))
+
+        jet_light = ak.where((jet_flat.passDeepJet_L) & (jet_flat.hadronFlavour==0))
+        jet_heavy = ak.where((jet_flat.passDeepJet_L) & (jet_flat.hadronFlavour!=0))
+        array_light = self._btag_sf["deepJet_incl"].evaluate("central", "L", jet_flat[jet_light].hadronFlavour.to_numpy(), abs(jet_flat[jet_light].eta).to_numpy(), jet_flat[jet_light].pt_nom.to_numpy())
+        array_heavy = self._btag_sf["deepJet_comb"].evaluate("central", "L", jet_flat[jet_heavy].hadronFlavour.to_numpy(), abs(jet_flat[jet_heavy].eta).to_numpy(), jet_flat[jet_heavy].pt_nom.to_numpy())
+        btagSF_deepjet_L[jet_light] = array_light
+        btagSF_deepjet_L[jet_heavy] = array_heavy
+        btagSF_deepjet_L = ak.unflatten(btagSF_deepjet_L, ak.num(emevents.Jet))
+        
+        jet_light = ak.where((jet_flat.passDeepJet_M) & (jet_flat.hadronFlavour==0))
+        jet_heavy = ak.where((jet_flat.passDeepJet_M) & (jet_flat.hadronFlavour!=0))
+        array_light = self._btag_sf["deepJet_incl"].evaluate("central", "M", jet_flat[jet_light].hadronFlavour.to_numpy(), abs(jet_flat[jet_light].eta).to_numpy(), jet_flat[jet_light].pt_nom.to_numpy())
+        array_heavy = self._btag_sf["deepJet_comb"].evaluate("central", "M", jet_flat[jet_heavy].hadronFlavour.to_numpy(), abs(jet_flat[jet_heavy].eta).to_numpy(), jet_flat[jet_heavy].pt_nom.to_numpy())
+        btagSF_deepjet_M[jet_light] = array_light
+        btagSF_deepjet_M[jet_heavy] = array_heavy
+        btagSF_deepjet_M = ak.unflatten(btagSF_deepjet_M, ak.num(emevents.Jet))
+        
+        jet_light = ak.where((jet_flat.passDeepJet_T) & (jet_flat.hadronFlavour==0))
+        jet_heavy = ak.where((jet_flat.passDeepJet_T) & (jet_flat.hadronFlavour!=0))
+        array_light = self._btag_sf["deepJet_incl"].evaluate("central", "T", jet_flat[jet_light].hadronFlavour.to_numpy(), abs(jet_flat[jet_light].eta).to_numpy(), jet_flat[jet_light].pt_nom.to_numpy())
+        array_heavy = self._btag_sf["deepJet_comb"].evaluate("central", "T", jet_flat[jet_heavy].hadronFlavour.to_numpy(), abs(jet_flat[jet_heavy].eta).to_numpy(), jet_flat[jet_heavy].pt_nom.to_numpy())
+        btagSF_deepjet_T[jet_light] = array_light
+        btagSF_deepjet_T[jet_heavy] = array_heavy
+        btagSF_deepjet_T = ak.unflatten(btagSF_deepjet_T, ak.num(emevents.Jet))
+        
         bTagJetSF_L = ak.prod(1-btagSF_deepjet_L*emevents.Jet.passDeepJet_L, axis=1)
         bTagJetSF_M = ak.prod(1-btagSF_deepjet_M*emevents.Jet.passDeepJet_M, axis=1)
         bTagJetSF_T = ak.prod(1-btagSF_deepjet_T*emevents.Jet.passDeepJet_T, axis=1)
-#        bTagCSVSF_L = ak.prod(1-emevents.Jet.btagSF_deepcsv_L*emevents.Jet.passDeepCSV_L, axis=1)
-#        bTagCSVSF_M = ak.prod(1-emevents.Jet.btagSF_deepcsv_M*emevents.Jet.passDeepCSV_M, axis=1)
+
+        SF = emevents.puWeight*emevents.genWeight
 
         #PU/PF/Gen Weights
         if self._year != '2018':
-          SF = emevents.puWeight*emevents.L1PreFiringWeight.Nom*emevents.genWeight
-        else:
-          SF = emevents.puWeight*emevents.genWeight
-        #Zvtx
-        if self._year == '2017':
-          SF = 0.991*SF
+         SF = SF*emevents.L1PreFiringWeight.Nom
 
         Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
         Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
@@ -146,11 +165,24 @@ class MyEMuPeak(processor.ProcessorABC):
         Muon_Hi = ak.mask(Muon_collections, Muon_collections['pt'] > 120)
         Trk_SF = ak.fill_none(self._evaluator['trackerMu'](abs(Muon_low.eta), Muon_low.pt), 1)
         Trk_SF_Hi = ak.fill_none(self._evaluator['trackerMu_Hi'](abs(Muon_Hi.eta), Muon_Hi.rho), 1)
-        SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*Trk_SF*Trk_SF_Hi
 
-        #Electron SF
-        SF = SF*Electron_collections.Reco_SF*Electron_collections.IDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
-        
+        if '2016' in self._year:
+          triggerstr = 'NUM_IsoMu24_or_IsoTkMu24_DEN_CutBasedIdTight_and_PFIsoTight'
+        elif self._year == '2017':
+          triggerstr = 'NUM_IsoMu27_DEN_CutBasedIdTight_and_PFIsoTight'
+        elif self._year == '2018':
+          triggerstr = 'NUM_IsoMu24_DEN_CutBasedIdTight_and_PFIsoTight'
+        MuTrigger_SF = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
+        MuID_SF = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
+        MuISO_SF = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
+
+        SF = SF*MuTrigger_SF*MuID_SF*MuISO_SF*Trk_SF*Trk_SF_Hi
+  
+        #Electron SF and lumi
+        EleReco_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","RecoAbove20", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+        EleIDnoISO_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","wp80noiso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+        SF = SF*EleReco_SF*EleIDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
+  
         SF_L, SF_M, SF_T = SF*bTagJetSF_L, SF*bTagJetSF_M, SF*bTagJetSF_T
         SF, SF_L, SF_M, SF_T = SF.to_numpy(), SF_L.to_numpy(), SF_M.to_numpy(), SF_T.to_numpy()
 
@@ -208,7 +240,7 @@ class MyEMuPeak(processor.ProcessorABC):
         return accumulator
 
 if __name__ == '__main__':
-  years = ['2017','2018']
+  years = ['2016preVFP', '2016postVFP', '2017', '2018']
   for year in years:
     with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)
@@ -222,21 +254,19 @@ if __name__ == '__main__':
     elif '2017' in year:
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2017_UL_trackerMuon.json"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2017HighPt.json"]
-      btag_sf_L = BTagScaleFactor("Corrections/bTag/DeepCSV_106XUL17SF_WPonly_V2p1.csv", 0)
-      btag_sf_M = BTagScaleFactor("Corrections/bTag/DeepCSV_106XUL17SF_WPonly_V2p1.csv", 1)
-      btag_sf_T = BTagScaleFactor("Corrections/bTag/DeepCSV_106XUL17SF_WPonly_V2p1.csv", 2)
     elif '2018' in year:
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2018_UL_trackerMuon.json"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2018HighPt.json"]
-      btag_sf_L = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL18SF_WPonly_V1p1.csv", 0)
-      btag_sf_M = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL18SF_WPonly_V1p1.csv", 1)
-      btag_sf_T = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL18SF_WPonly_V1p1.csv", 2)
+
+    btag_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/BTV/{year}_UL/btagging.json.gz")
+    muon_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/MUO/{year}_UL/muon_Z.json.gz")
+    electron_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/EGM/{year}_UL/electron.json.gz")
 
     ext = extractor()
     ext.add_weight_sets(TrackerMu)
     ext.add_weight_sets(TrackerMu_Hi)
     ext.finalize()
     evaluator = ext.make_evaluator()
-    processor_instance = MyEMuPeak(lumiWeight, year, btag_sf_L, btag_sf_M, btag_sf_T, evaluator)
+    processor_instance = MyEMuPeak(lumiWeight, year, btag_sf, muon_sf, electron_sf, evaluator)
     outname = os.path.basename(__file__).replace('.py','')
     save(processor_instance, f'processors/{outname}_{year}.coffea')
