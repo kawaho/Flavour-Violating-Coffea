@@ -63,26 +63,24 @@ class MyEMuPeak(processor.ProcessorABC):
         self._lumiWeight = lumiWeight
         self._BDTmodels = BDTmodels
         self._year = year
-        self.var_0jet_ = BDTvars['model_GG_0jets'] 
-        self.var_1jet_ = BDTvars['model_GG_1jets']
-        self.var_2jet_GG_ = BDTvars['model_GG_2jets']
-        self.var_2jet_VBF_ = BDTvars['model_VBF_2jets']
+        self.var_GG_ = BDTvars['model_GG']
+        self.var_2jet_VBF_ = BDTvars['model_VBF']
         self._accumulator = processor.dict_accumulator({})
         self._accumulator[f'e_m_Mass'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'mva'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'isVBFcat'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'nJet30'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'njets'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'weight'] = processor.column_accumulator(numpy.array([]))
   
     @property
     def accumulator(self):
         return self._accumulator
     
-    def BDTscore(self, njets, XFrame, isVBF=False):
+    def BDTscore(self, XFrame, isVBF=False):
         if isVBF:
-           model_load = self._BDTmodels["model_VBF_2jets"]
+           model_load = self._BDTmodels["model_VBF"]
         else:
-           model_load = self._BDTmodels[f"model_GG_{njets}jets"]
+           model_load = self._BDTmodels[f"model_GG"]
         return model_load.predict_proba(XFrame)
 
     def Vetos(self, events):
@@ -160,7 +158,7 @@ class MyEMuPeak(processor.ProcessorABC):
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
 
-        massRange = (emVar.mass<160) & (emVar.mass>100)
+        massRange = (emVar.mass<160) & (emVar.mass>110)
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
@@ -176,6 +174,7 @@ class MyEMuPeak(processor.ProcessorABC):
         #emevents["m_met_mT"] = mT(Muon_collections, MET_collections)
         #pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
         #emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
+        emevents["njets"] = emevents.nJet30 
         #1 jet
         emevents['j1pt'] = Jet_collections[:,0].pt
         emevents['j1Eta'] = Jet_collections[:,0].eta
@@ -186,7 +185,7 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents["j1_j2_mass"] = (Jet_collections[:,0] + Jet_collections[:,1]).mass
         emevents["DeltaEta_em_j1j2"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - emVar.eta)
         emevents["DeltaEta_j1_j2"] = abs(Jet_collections[:,0].eta - Jet_collections[:,1].eta)
-        emevents["isVBFcat"] = ((emevents["nJet30"] >= 2) & (emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5)) 
+        emevents["isVBFcat"] = ((emevents["njets"] >= 2) & (emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5)) 
         emevents["isVBFcat"] = ak.fill_none(emevents["isVBFcat"], 0)
         emevents["Zeppenfeld_DeltaEta"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
         emevents["Rpt"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
@@ -196,16 +195,11 @@ class MyEMuPeak(processor.ProcessorABC):
         return emevents
 
     def pandasDF(self, emevents):
-        Xframe_0jet = ak.to_pandas(emevents[self.var_0jet_])
-        Xframe_1jet = ak.to_pandas(emevents[self.var_1jet_])
-        Xframe_2jet_GG = ak.to_pandas(emevents[self.var_2jet_GG_])
+        Xframe_GG = ak.to_pandas(emevents[self.var_GG_]).fillna(value=numpy.nan)
         Xframe_2jet_VBF = ak.to_pandas(emevents[self.var_2jet_VBF_])
-        emevents_0jet_nom = self.BDTscore(0, Xframe_0jet)[:,1] 
-        emevents_1jet_nom = self.BDTscore(1, Xframe_1jet)[:,1] 
-        emevents_2jet_GG_nom = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
-        emevents_2jet_VBF_nom = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
-
-        emevents['mva'] = (emevents.nJet30 == 0) * emevents_0jet_nom + (emevents.nJet30 == 1) * emevents_1jet_nom + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG_nom + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF_nom
+        emevents_GG_nom = self.BDTscore(Xframe_GG)[:,1] 
+        emevents_2jet_VBF_nom = self.BDTscore(Xframe_2jet_VBF, True)[:,1] 
+        emevents['mva'] = (emevents.isVBFcat==0) * emevents_GG_nom + ((emevents.njets>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF_nom
         return emevents
 
     # we will receive a NanoEvents instead of a coffea DataFrame
@@ -229,7 +223,7 @@ class MyEMuPeak(processor.ProcessorABC):
         return accumulator
 
 if __name__ == '__main__':
-  BDTjsons = ['model_GG_0jets', 'model_GG_1jets', 'model_GG_2jets', 'model_VBF_2jets']
+  BDTjsons = ['model_GG', 'model_VBF']
   BDTmodels = {}
   BDTvars = {}
   for BDTjson in BDTjsons:

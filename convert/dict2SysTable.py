@@ -19,21 +19,28 @@ leptonUnc = ['me']#['ees', 'eer', 'me']
 years = ['2016preVFP', '2016postVFP', '2017', '2018']
 
 #Create dataframe for systematics: mva_sys/weight_sys/....etc 
-var_dict = {}
+df_year = []
 for year in years:
   print(f'Processing {year}')
-  result = load(f"results/{year}/makeSys/output.coffea")
+  result = load(f"results/{year}/makeSys/output_WJet2.coffea")
   if isinstance(result,tuple):
       result = result[0]
   for varName in result:
-    if varName in var_dict:
-      var_dict[varName] = np.append(var_dict[varName], result[varName].value, axis=0)
-    else:
-      var_dict[varName] = result[varName].value
+    result[varName] = result[varName].value
+
+  df_year.append(pd.DataFrame(result))
+  df_year[-1] = df_year[-1][(df_year[-1].e_m_Mass>110) & (df_year[-1].e_m_Mass<160)]
+  print(f'Finish {year}')
+
+#  for varName in result:
+#    if varName in var_dict:
+#      var_dict[varName] = np.append(var_dict[varName], result[varName].value, axis=0)
+#    else:
+#      var_dict[varName] = result[varName].value
 
 #Get total weight of all years for acceptance calculations
 theory_total_weight = {}
-df = pd.DataFrame(var_dict)
+df = pd.concat(df_year)
 
 theory_total_weight["weight_GG"] = df[(df['isVBF']==0)&(df['isHerwig']==0)]["weight"].sum()
 theory_total_weight["weight_scalep5p5_GG"] = df[(df['isVBF']==0)&(df['isHerwig']==0)]["weight_scalep5p5"].sum()

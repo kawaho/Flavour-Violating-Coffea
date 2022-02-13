@@ -3,6 +3,7 @@ from coffea.util import save
 from coffea.lookup_tools import extractor
 from coffea.btag_tools import BTagScaleFactor
 import xgboost as xgb
+import pandas as pd
 import awkward as ak
 import correctionlib, numpy, json, os
 
@@ -70,35 +71,34 @@ class MyEMuPeak(processor.ProcessorABC):
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._year = year
-        self.var_0jet_ = BDTvars['model_GG_0jets'] 
-        self.var_1jet_ = BDTvars['model_GG_1jets']
-        self.var_2jet_GG_ = BDTvars['model_GG_2jets']
-        self.var_2jet_VBF_ = BDTvars['model_VBF_2jets']
+        self._jecYear = self._year[:4]
+        self.var_GG_ = BDTvars['model_GG']
+        self.var_2jet_VBF_ = BDTvars['model_VBF']
         self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal']
         self.metUnc = ['UnclusteredEn']
-        self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
-        self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
-        self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017']
+        self.jetyearUnc = [f'jer_{self._jecYear}', f'jesAbsolute_{self._jecYear}', f'jesBBEC1_{self._jecYear}', f'jesEC2_{self._jecYear}', f'jesHF_{self._jecYear}', f'jesRelativeSample_{self._jecYear}']
+#        self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
+        self.sfUnc = [f'pu_{self._year}', f'bTag_{self._year}', f'pf_{self._year}'] 
+        #self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
+        #self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017']
         self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
         self.leptonUnc = ['me']#['ees', 'eer', 'me']
         self._accumulator = processor.dict_accumulator({})
         self._accumulator[f'e_m_Mass'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'isVBFcat'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'isVBF'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'isHerwig'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'nJet30'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'is2016'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'is2017'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'is2018'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'isVBFcat'] = processor.column_accumulator(numpy.bool_([]))
+        self._accumulator[f'isVBF'] = processor.column_accumulator(numpy.bool_([]))
+        self._accumulator[f'isHerwig'] = processor.column_accumulator(numpy.bool_([]))
+        self._accumulator[f'njets'] = processor.column_accumulator(numpy.ubyte([]))
+        self._accumulator[f'year'] = processor.column_accumulator(numpy.ubyte([]))
         self._accumulator[f'mva'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'weight'] = processor.column_accumulator(numpy.array([]))
         for sys in self.jetUnc+self.jetyearUnc:
             self._accumulator[f'mva_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'mva_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[f'isVBFcat_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[f'isVBFcat_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[f'nJet30_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[f'nJet30_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
+            self._accumulator[f'isVBFcat_{sys}_Up'] = processor.column_accumulator(numpy.bool_([]))
+            self._accumulator[f'isVBFcat_{sys}_Down'] = processor.column_accumulator(numpy.bool_([]))
+            self._accumulator[f'njets_{sys}_Up'] = processor.column_accumulator(numpy.ubyte([]))
+            self._accumulator[f'njets_{sys}_Down'] = processor.column_accumulator(numpy.ubyte([]))
         for sys in self.metUnc:
             self._accumulator[f'mva_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'mva_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
@@ -117,11 +117,11 @@ class MyEMuPeak(processor.ProcessorABC):
     def accumulator(self):
         return self._accumulator
     
-    def BDTscore(self, njets, XFrame, isVBF=False):
+    def BDTscore(self, XFrame, isVBF=False):
         if isVBF:
-           model_load = self._BDTmodels["model_VBF_2jets"]
+           model_load = self._BDTmodels["model_VBF"]
         else:
-           model_load = self._BDTmodels[f"model_GG_{njets}jets"]
+           model_load = self._BDTmodels[f"model_GG"]
         return model_load.predict_proba(XFrame)
 
     def Vetos(self, events):
@@ -251,14 +251,18 @@ class MyEMuPeak(processor.ProcessorABC):
         SF[abs(SF)>10] = 0
         emevents["weight"] = SF
         
-        for other_year in ['2016preVFP', '2016postVFP', '2017', '2018']:
-          emevents[f"weight_bTag_{other_year}_Up"] = SF
-          emevents[f"weight_bTag_{other_year}_Down"] = SF
-          emevents[f"weight_pu_{other_year}_Up"] = SF
-          emevents[f"weight_pu_{other_year}_Down"] = SF
-        for other_year in ['2016preVFP', '2016postVFP', '2017']:
-          emevents[f"weight_pf_{other_year}_Up"] = SF
-          emevents[f"weight_pf_{other_year}_Down"] = SF
+#        for other_year in ['2016preVFP', '2016postVFP', '2017', '2018']:
+#          if other_year!=self._year:
+#            continue
+#          emevents[f"weight_bTag_{other_year}_Up"] = SF
+#          emevents[f"weight_bTag_{other_year}_Down"] = SF
+#          emevents[f"weight_pu_{other_year}_Up"] = SF
+#          emevents[f"weight_pu_{other_year}_Down"] = SF
+#        for other_year in ['2016preVFP', '2016postVFP', '2017']:
+#          if other_year!=self._year:
+#            continue
+#          emevents[f"weight_pf_{other_year}_Up"] = SF
+#          emevents[f"weight_pf_{other_year}_Down"] = SF
 
 	#bTag Up/Down
         array_light_up = self._btag_sf["deepJet_incl"].evaluate("up_uncorrelated", "L", jet_flat[jet_light].hadronFlavour.to_numpy(), abs(jet_flat[jet_light].eta).to_numpy(), jet_flat[jet_light].pt_nom.to_numpy())
@@ -307,17 +311,20 @@ class MyEMuPeak(processor.ProcessorABC):
     def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
         #make interesting variables
         #zero/any no. of jets
-        emevents["is2016"] = numpy.ones(len(emevents)) if '2016' in self._year else numpy.zeros(len(emevents))
-        emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))
-        emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
+        if '2016' in self._year:
+          emevents["year"] = numpy.full(len(emevents), 0, dtype=numpy.ubyte)
+        elif '2017' in self._year:
+          emevents["year"] = numpy.full(len(emevents), 1, dtype=numpy.ubyte)
+        else:
+          emevents["year"] = numpy.full(len(emevents), 2, dtype=numpy.ubyte)
         if ('VBF' in emevents.metadata["dataset"]) and (not 'herwig' in emevents.metadata["dataset"]):
-          emevents["isVBF"] = numpy.ones(len(emevents)) 
+          emevents["isVBF"] = numpy.full(len(emevents), True, dtype=numpy.bool_) 
         else:
-          emevents["isVBF"] = numpy.zeros(len(emevents)) 
+          emevents["isVBF"] = numpy.full(len(emevents), False, dtype=numpy.bool_) 
         if 'herwig' in emevents.metadata["dataset"]:
-          emevents["isHerwig"] = numpy.ones(len(emevents)) 
+          emevents["isHerwig"] = numpy.full(len(emevents), True, dtype=numpy.bool_) 
         else:
-          emevents["isHerwig"] = numpy.zeros(len(emevents)) 
+          emevents["isHerwig"] = numpy.full(len(emevents), False, dtype=numpy.bool_)
         emVar = Electron_collections + Muon_collections
         emevents["e_m_Mass"] = emVar.mass
 #        emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emVar.mass
@@ -331,6 +338,7 @@ class MyEMuPeak(processor.ProcessorABC):
 
 #        pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
 #        emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
+        emevents["njets"] = emevents.nJet30 
 
         #1 jet
         emevents['j1pt'] = Jet_collections[:,0].pt
@@ -342,8 +350,8 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents["j1_j2_mass"] = (Jet_collections[:,0] + Jet_collections[:,1]).mass
         emevents["DeltaEta_em_j1j2"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - emVar.eta)
         emevents["DeltaEta_j1_j2"] = abs(Jet_collections[:,0].eta - Jet_collections[:,1].eta)
-        emevents["isVBFcat"] = ((emevents["nJet30"] >= 2) & (emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5)) 
-        emevents["isVBFcat"] = ak.fill_none(emevents["isVBFcat"], 0)
+        emevents["isVBFcat"] = ((emevents["njets"] >= 2) & (emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5)) 
+        emevents["isVBFcat"] = ak.fill_none(emevents["isVBFcat"], False)
         emevents["Zeppenfeld_DeltaEta"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
         emevents["Rpt"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
         emevents["pt_cen_Deltapt"] = pt_cen(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/(Jet_collections[:,0] - Jet_collections[:,1]).pt
@@ -400,11 +408,11 @@ class MyEMuPeak(processor.ProcessorABC):
           #Jet Unc
           semitmpJet_collections = ak.copy(emevents.Jet)
           for jetUnc in self.jetUnc+self.jetyearUnc:
-             jecYear = self._year[:4]
-             if jetUnc in self.jetyearUnc and not jecYear in jetUnc:
+             if jetUnc in self.jetyearUnc and not self._jecYear in jetUnc:
                #ignore this year
-               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = emevents["isVBFcat"] 
-               emevents[f"nJet30_{jetUnc}_{UpDown}"] = emevents["nJet30"]
+               continue
+               #emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = emevents["isVBFcat"] 
+               #emevents[f"njets_{jetUnc}_{UpDown}"] = emevents["njets"]
              else:
                if 'jer' in jetUnc: 
                  jetUncNoyear='jer'
@@ -412,7 +420,7 @@ class MyEMuPeak(processor.ProcessorABC):
                  jetUncNoyear=jetUnc
                semitmpJet_collections[f'passJet30ID_{jetUnc}{UpDown}'] = (Electron_collections.delta_r(semitmpJet_collections) > 0.4) & (Muon_collections.delta_r(semitmpJet_collections) > 0.4) & (semitmpJet_collections[f'pt_{jetUncNoyear}{UpDown}']>30) & ((semitmpJet_collections.jetId>>1) & 1) & (abs(semitmpJet_collections.eta)<4.7) & (((semitmpJet_collections.puId>>2)&1) | (semitmpJet_collections[f'pt_{jetUncNoyear}{UpDown}']>50))  
                tmpJet_collections = semitmpJet_collections[semitmpJet_collections[f'passJet30ID_{jetUnc}{UpDown}']==1]
-               emevents[f"nJet30_{jetUnc}_{UpDown}"] = ak.num(tmpJet_collections)
+               emevents[f"njets_{jetUnc}_{UpDown}"] = ak.num(tmpJet_collections)
                tmpJet_collections['pt'] = tmpJet_collections[f'pt_{jetUncNoyear}{UpDown}']
                tmpJet_collections['mass'] = tmpJet_collections[f'mass_{jetUncNoyear}{UpDown}']
                #ensure Jets are pT-ordered
@@ -437,8 +445,8 @@ class MyEMuPeak(processor.ProcessorABC):
                emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] = (tmpJet_collections[:,0] + tmpJet_collections[:,1]).mass
                emevents[f"DeltaEta_em_j1j2_{jetUnc}_{UpDown}"] = abs((tmpJet_collections[:,0] + tmpJet_collections[:,1]).eta - emVar.eta)
                emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"] = abs(tmpJet_collections[:,0].eta - tmpJet_collections[:,1].eta)
-               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ((emevents[f"nJet30_{jetUnc}_{UpDown}"] >= 2) & (emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] > 400) & (emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"] > 2.5)) 
-               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ak.fill_none(emevents[f"isVBFcat_{jetUnc}_{UpDown}"], 0)
+               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ((emevents[f"njets_{jetUnc}_{UpDown}"] >= 2) & (emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] > 400) & (emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"] > 2.5)) 
+               emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ak.fill_none(emevents[f"isVBFcat_{jetUnc}_{UpDown}"], False)
                emevents[f"Zeppenfeld_DeltaEta_{jetUnc}_{UpDown}"] = Zeppenfeld(Muon_collections, Electron_collections, [tmpJet_collections[:,0], tmpJet_collections[:,1]])/emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"]
                emevents[f"Rpt_{jetUnc}_{UpDown}"] = Rpt(Muon_collections, Electron_collections, [tmpJet_collections[:,0], tmpJet_collections[:,1]])
                emevents[f"pt_cen_Deltapt_{jetUnc}_{UpDown}"] = pt_cen(Muon_collections, Electron_collections, [tmpJet_collections[:,0], tmpJet_collections[:,1]])/(tmpJet_collections[:,0] - tmpJet_collections[:,1]).pt
@@ -448,45 +456,31 @@ class MyEMuPeak(processor.ProcessorABC):
 
     def pandasDF(self, emevents, unc=None, updown=None, isJetSys=False):
         if unc==None:
-          Xframe_0jet = ak.to_pandas(emevents[self.var_0jet_])
-          Xframe_1jet = ak.to_pandas(emevents[self.var_1jet_])
-          Xframe_2jet_GG = ak.to_pandas(emevents[self.var_2jet_GG_])
+          Xframe_GG = ak.to_pandas(emevents[self.var_GG_]).fillna(value=numpy.nan)
           Xframe_2jet_VBF = ak.to_pandas(emevents[self.var_2jet_VBF_])
-     
-          emevents_0jet_nom = self.BDTscore(0, Xframe_0jet)[:,1] 
-          emevents_1jet_nom = self.BDTscore(1, Xframe_1jet)[:,1] 
-          emevents_2jet_GG_nom = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
-          emevents_2jet_VBF_nom = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
-          emevents['mva'] = (emevents.nJet30 == 0) * emevents_0jet_nom + (emevents.nJet30 == 1) * emevents_1jet_nom + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG_nom + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF_nom
+ 
+          emevents_GG_nom = self.BDTscore(Xframe_GG)[:,1] 
+          emevents_2jet_VBF_nom = self.BDTscore(Xframe_2jet_VBF, True)[:,1] 
+          emevents['mva'] = (emevents.isVBFcat==0) * emevents_GG_nom + ((emevents.njets>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF_nom
         else:
-          var_0jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_0jet_] 
-          var_1jet_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_1jet_] 
-          var_2jet_GG_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_2jet_GG_] 
+          var_GG_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_GG_] 
           var_2jet_VBF_alt = [i+f'_{unc}_{updown}' if i+f'_{unc}_{updown}' in emevents.fields else i for i in self.var_2jet_VBF_] 
 
-          Xframe_0jet = ak.to_pandas(emevents[var_0jet_alt])
-          Xframe_1jet = ak.to_pandas(emevents[var_1jet_alt])
-          Xframe_2jet_GG = ak.to_pandas(emevents[var_2jet_GG_alt])
+          Xframe_GG = ak.to_pandas(emevents[var_GG_alt]).fillna(value=numpy.nan)
           Xframe_2jet_VBF = ak.to_pandas(emevents[var_2jet_VBF_alt])
   
-          rename0_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_0jet_alt}
-          rename1_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_1jet_alt}
-          rename2_GG_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_2jet_GG_alt}
+          rename2_GG_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_GG_alt}
           rename2_VBF_ = {i:i.replace(f'_{unc}_{updown}', '') for i in var_2jet_VBF_alt}
 
-          Xframe_0jet.rename(columns=rename0_, inplace = True)
-          Xframe_1jet.rename(columns=rename1_, inplace = True)
-          Xframe_2jet_GG.rename(columns=rename2_GG_, inplace = True)
+          Xframe_GG.rename(columns=rename2_GG_, inplace = True)
           Xframe_2jet_VBF.rename(columns=rename2_VBF_, inplace = True)
      
-          emevents_0jet = self.BDTscore(0, Xframe_0jet)[:,1] 
-          emevents_1jet = self.BDTscore(1, Xframe_1jet)[:,1] 
-          emevents_2jet_GG = self.BDTscore(2, Xframe_2jet_GG)[:,1] 
-          emevents_2jet_VBF = self.BDTscore(2, Xframe_2jet_VBF, True)[:,1] 
+          emevents_GG = self.BDTscore(Xframe_GG)[:,1] 
+          emevents_2jet_VBF = self.BDTscore(Xframe_2jet_VBF, True)[:,1] 
           if isJetSys:
-            emevents[f'mva_{unc}_{updown}'] = (emevents[f"nJet30_{unc}_{updown}"] == 0) * emevents_0jet + (emevents[f"nJet30_{unc}_{updown}"] == 1) * emevents_1jet + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==0)) * emevents_2jet_GG + ((emevents[f"nJet30_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==1))* emevents_2jet_VBF
+            emevents[f'mva_{unc}_{updown}'] = (emevents[f"isVBFcat_{unc}_{updown}"]==0) * emevents_GG + ((emevents[f"njets_{unc}_{updown}"]>=2) & (emevents[f"isVBFcat_{unc}_{updown}"]==1))* emevents_2jet_VBF
           else:
-            emevents[f'mva_{unc}_{updown}'] = (emevents.nJet30 == 0) * emevents_0jet + (emevents.nJet30 == 1) * emevents_1jet + ((emevents.nJet30>=2) & (emevents.isVBFcat==0)) * emevents_2jet_GG + ((emevents.nJet30>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF
+            emevents[f'mva_{unc}_{updown}'] = (emevents.isVBFcat==0) * emevents_GG + ((emevents.njets>=2) & (emevents.isVBFcat==1))* emevents_2jet_VBF
         return emevents
 
     # we will receive a NanoEvents instead of a coffea DataFrame
@@ -518,7 +512,7 @@ class MyEMuPeak(processor.ProcessorABC):
         return accumulator
 
 if __name__ == '__main__':
-  BDTjsons = ['model_GG_0jets', 'model_GG_1jets', 'model_GG_2jets', 'model_VBF_2jets']
+  BDTjsons = ['model_GG', 'model_VBF']
   BDTmodels = {}
   BDTvars = {}
   for BDTjson in BDTjsons:
@@ -533,7 +527,6 @@ if __name__ == '__main__':
     with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)
     if '2016' in year:
-      QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2016.root"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2016HighPt.json"]
       if 'pre' in year:
         TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016preVFP_UL_trackerMuon.json"]
@@ -541,11 +534,9 @@ if __name__ == '__main__':
         TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016postVFP_UL_trackerMuon.json"]
          
     elif '2017' in year:
-      QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2017.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2017.root"]
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2017_UL_trackerMuon.json"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2017HighPt.json"]
     elif '2018' in year:
-      QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_closureOS Corrections/QCD/em_qcd_osss_2018.root", "hist_em_qcd_osss_os_corr hist_em_qcd_extrap_uncert Corrections/QCD/em_qcd_osss_2018.root"]
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2018_UL_trackerMuon.json"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2018HighPt.json"]
 
@@ -553,7 +544,6 @@ if __name__ == '__main__':
     muon_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/MUO/{year}_UL/muon_Z.json.gz")
     electron_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/EGM/{year}_UL/electron.json.gz")
     ext = extractor()
-    ext.add_weight_sets(QCDhist)
     ext.add_weight_sets(TrackerMu)
     ext.add_weight_sets(TrackerMu_Hi)
     ext.finalize()
