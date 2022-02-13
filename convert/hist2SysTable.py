@@ -76,10 +76,9 @@ df_ggcat_data, df_vbfcat_data = df_data[(df_data['isVBFcat']==0)], df_data[(df_d
 
 #Create dataframe for fast calulcations of systematics
 for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_data, df_vbfcat_data], ['GGcat', 'VBFcat']):
+  print(f'Running {whichcat}')
   #Get mva values corresponding to 100 quantiles 
-  quantiles = np.load(f"XGBoost-for-HtoEMu/results/{whichcat}_quantiles",allow_pickle=True)
-  with open(f"results/SenScan/{whichcat}_quantiles.json", 'w') as f:
-    json.dump(quantiles.tolist(), f, indent=2) 
+  quantiles = np.load(f"results/SenScan/{whichcat}_quantiles",allow_pickle=True)
   #Create tree for mva/weight/e_m_Mass
   datasets = []
   e_m_Mass = df_gg_vbf_data[f'e_m_Mass'].to_numpy()
@@ -90,7 +89,7 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
 
   #Divide into GG/VBF
   for df_gg_vbf_deep, whichcat_deep in zip([df_gg_vbf[df_gg_vbf['isVBF']==0], df_gg_vbf[df_gg_vbf['isVBF']==1]], ['GG', 'VBF']):
-
+    print(f'Running {whichcat_deep}')
     quan_dict = defaultdict(list)
 
     #Create tree for mva/weight/e_m_Mass/lep scale/smearing
@@ -115,46 +114,22 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
       f['tree'].extend(uproot_tree_dict)
 
     #Loop through quantiles and turn tree into RooDataSet
-    def FillSys(i):
-      print(f'Filling Sys for {whichcat_deep} {whichcat} Quantiles {i}')
-      dict_ = []
-      subdf = df_gg_vbf_deep[(df_gg_vbf_deep['mva']<quantiles[i+1])&(df_gg_vbf_deep['mva']>=quantiles[i])]
-      #Store all the sys weight/acceptance
-      dict_.append(['quantiles', i+1])
-      dict_.append(['lowerMVA', quantiles[i]])
-      dict_.append(['weight', subdf['weight'].sum()])
-      dict_.append(["weight2016", weight_year[f'{whichcat_deep}_{whichcat}'][0][i]+weight_year[f'{whichcat_deep}_{whichcat}'][1][i]])
-      dict_.append(["weight2017", weight_year[f'{whichcat_deep}_{whichcat}'][2][i]])
-      dict_.append(["weight2018", weight_year[f'{whichcat_deep}_{whichcat}'][3][i]])
-      dict_.append(['acc', subdf['weight'].sum()/theory_total_weight[f'weight_{whichcat_deep}']])
-#      if whichcat_deep=='VBF':
-#        if whichcat=='VBFcat':
-#          df_herwig = df_vbfcat_herwig
-#        else:
-#          df_herwig = df_ggcat_herwig
-#        subdf = df_herwig[(df_herwig[f'mva']<quantiles[i+1])&(df_herwig[f'mva']>=quantiles[i])]
-#        dict_.append([f'weight_herwig', subdf[f'weight'].sum()])
-      for sys in theoUnc:
-        dict_.append([f'weight_{sys}', hist_dict[f'mva_hist_{sys}-{whichcat_deep}_{whichcat}'][i]/theory_total_weight[f'weight_{sys}_{whichcat_deep}']])
-      for UpDown in ['Up', 'Down']:
-        for sys in jetUnc+jetyearUnc+sfUnc+leptonUnc+metUnc:
-          dict_.append([f'weight_{sys}_{UpDown}', hist_dict[f'mva_hist_{sys}_{UpDown}-{whichcat_deep}_{whichcat}'][i]])
-      return dict_
 
-
-    #for i in range(len(quantiles)-1):
-    #  FillSys(i)
-    executor = concurrent.futures.ProcessPoolExecutor()#32)
-    futures = [executor.submit(FillSys, i) 
-           for i in range(len(quantiles)-1)]
-    long_dict_ = []
-    for future in concurrent.futures.as_completed(futures):
-      long_dict_.extend(future.result())
-    concurrent.futures.wait(futures)
-    for key, val in long_dict_:
-      quan_dict.setdefault(key, []).append(val)
-
+    dict_ = {}
+    dict_['quantiles'] = np.arange(1,101) 
+    dict_['lowerMVA'] = quantiles[:-1]
+    dict_['weight'] = hist_dict[f'mva_hist-{whichcat_deep}_{whichcat}']
+    dict_["weight2016"] = weight_year[f'{whichcat_deep}_{whichcat}'][0]+weight_year[f'{whichcat_deep}_{whichcat}'][1]
+    dict_["weight2017"] = weight_year[f'{whichcat_deep}_{whichcat}'][2]
+    dict_["weight2018"] = weight_year[f'{whichcat_deep}_{whichcat}'][3]
+    dict_['acc'] = dict_['weight']/theory_total_weight[f'weight_{whichcat_deep}']
+    for sys in theoUnc:
+      dict_[f'weight_{sys}'] = hist_dict[f'mva_hist_{sys}-{whichcat_deep}_{whichcat}']/theory_total_weight[f'weight_{sys}_{whichcat_deep}']
+    for UpDown in ['Up', 'Down']:
+      for sys in jetUnc+jetyearUnc+sfUnc+leptonUnc+metUnc:
+        dict_[f'weight_{sys}_{UpDown}'] = hist_dict[f'mva_hist_{sys}_{UpDown}-{whichcat_deep}_{whichcat}']
+    
     #output sys dataframe
-    quan_df = pd.DataFrame(quan_dict)
+    quan_df = pd.DataFrame.from_dict(dict_)
     quan_df.sort_values(by='quantiles', inplace=True)
     quan_df.set_index('quantiles').to_csv(f'results/SenScan/{whichcat_deep}_{whichcat}.csv')    
