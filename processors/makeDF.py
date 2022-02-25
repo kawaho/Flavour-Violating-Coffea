@@ -164,7 +164,6 @@ class MyDF(processor.ProcessorABC):
         
         #Muon pT corrections
         #MET_collections = MET_collections+Muon_collections[:,0]
-        Muon_collections['mass'] = Muon_collections['mass']*Muon_collections['corrected_pt']/Muon_collections['pt']
         Muon_collections['pt'] = Muon_collections['corrected_pt']
         #MET_collections = MET_collections-Muon_collections[:,0]
 

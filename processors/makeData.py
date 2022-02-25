@@ -146,7 +146,6 @@ class MyEMuPeak(processor.ProcessorABC):
         MET_collections['pt'] = MET_collections['T1_pt'] 
 
         #Muon pT corrections
-        Muon_collections['mass'] = Muon_collections['mass']*Muon_collections['corrected_pt']/Muon_collections['pt']
         Muon_collections['pt'] = Muon_collections['corrected_pt']
 
         #ensure Jets are pT-ordered

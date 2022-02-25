@@ -78,9 +78,9 @@ class MyEMuPeak(processor.ProcessorABC):
         self.metUnc = ['UnclusteredEn']
         self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
         self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
-        self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017']
+        self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017', 'mID', 'mIso', 'mTrg', 'eReco', 'eID']
         self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
-        self.leptonUnc = ['me']#['ees', 'eer', 'me']
+        self.leptonUnc = ['ees', 'eer', 'me']
         self._accumulator = processor.dict_accumulator({})
         self._accumulator[f'e_m_Mass'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'isVBFcat'] = processor.column_accumulator(numpy.bool_([]))
@@ -180,15 +180,10 @@ class MyEMuPeak(processor.ProcessorABC):
         Jet_collections['mass'] = Jet_collections['mass_nom']
 
         #MET corrections
-        if emevents.metadata["dataset"]!='SingleMuon' and emevents.metadata["dataset"]!='data':
-            MET_collections['phi'] = MET_collections['T1Smear_phi'] 
-            MET_collections['pt'] = MET_collections['T1Smear_pt'] 
-        else:
-            MET_collections['phi'] = MET_collections['T1_phi'] 
-            MET_collections['pt'] = MET_collections['T1_pt'] 
+        MET_collections['phi'] = MET_collections['T1_phi'] 
+        MET_collections['pt'] = MET_collections['T1_pt'] 
 
         #Muon pT corrections
-        Muon_collections['mass'] = Muon_collections['mass']*Muon_collections['corrected_pt']/Muon_collections['pt']
         Muon_collections['pt'] = Muon_collections['corrected_pt']
 
         #ensure Jets are pT-ordered
@@ -251,6 +246,27 @@ class MyEMuPeak(processor.ProcessorABC):
         SF[abs(SF)>10] = 0
         emevents["weight"] = SF
         
+        MuTrigger_SF_Up = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systup") 
+        MuID_SF_Up = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systup") 
+        MuISO_SF_Up = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systup") 
+        MuTrigger_SF_Down = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systdown") 
+        MuID_SF_Down = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systdown") 
+        MuISO_SF_Down = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systdown") 
+        emevents[f"weight_mID_Up"] = SF*MuID_SF_Up/MuID_SF
+        emevents[f"weight_mIso_Up"] = SF*MuISO_SF_Up/MuISO_SF
+        emevents[f"weight_mTrg_Up"] = SF*MuTrigger_SF_Up/MuTrigger_SF
+        emevents[f"weight_mID_Down"] = SF*MuID_SF_Down/MuID_SF
+        emevents[f"weight_mIso_Down"] = SF*MuISO_SF_Down/MuISO_SF
+        emevents[f"weight_mTrg_Down"] = SF*MuTrigger_SF_Down/MuTrigger_SF
+        EleReco_SF_Up = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sfup","RecoAbove20", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+        EleIDnoISO_SF_Up = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sfup","wp80noiso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+        EleReco_SF_Down = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sfdown","RecoAbove20", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+        EleIDnoISO_SF_Down = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sfdown","wp80noiso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+        emevents[f"weight_eReco_Up"] = SF*EleReco_SF_Up/EleReco_SF
+        emevents[f"weight_eID_Up"] = SF*EleIDnoISO_SF_Up/EleIDnoISO_SF
+        emevents[f"weight_eReco_Down"] = SF*EleReco_SF_Down/EleReco_SF
+        emevents[f"weight_eID_Down"] = SF*EleIDnoISO_SF_Down/EleIDnoISO_SF
+
         for other_year in ['2016preVFP', '2016postVFP', '2017', '2018']:
           emevents[f"weight_bTag_{other_year}_Up"] = SF
           emevents[f"weight_bTag_{other_year}_Down"] = SF
@@ -356,20 +372,42 @@ class MyEMuPeak(processor.ProcessorABC):
         #Systematics
 
         for UpDown in ['Up', 'Down']:
-#          #Electron Energy Scale
-#          tmpElectron_collections = ak.copy(Electron_collections)
-#          tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpElectron_collections[f'dEscale{UpDown}']/Electron_collections['eCorr']
-#          #Redo all Electron var
-#  
-#          #Electron Energy Reso
-#          tmpElectron_collections = ak.copy(Electron_collections)
+          #Electron Energy Scale
+          tmpFac = 1.01 if UpDown=='Up' else 0.99
+          tmpElectron_collections = ak.copy(Electron_collections)
+          tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpFac
+          #tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpElectron_collections[f'dEscale{UpDown}']/Electron_collections['eCorr']
+          #Redo all Electron var
+          tmpemVar = tmpElectron_collections + Muon_collections
+          emevents[f'e_m_Mass_ees_{UpDown}'] = tmpemVar.mass
+          emevents[f"empt_ees_{UpDown}"] = tmpemVar.pt
+          emevents[f"DeltaEta_e_m_ees_{UpDown}"] = abs(Muon_collections.eta - tmpElectron_collections.eta)
+          emevents["DeltaPhi_em_met_ees_{UpDown}"] = tmpemVar.delta_phi(MET_collections)
+          emevents[f"DeltaEta_j1_em_ees_{UpDown}"] = abs(Jet_collections[:,0].eta - tmpemVar.eta)
+          emevents[f"DeltaEta_em_j1j2_ees_{UpDown}"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - tmpemVar.eta)
+          emevents[f"Zeppenfeld_DeltaEta_ees_{UpDown}"] = Zeppenfeld(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
+          emevents[f"Rpt_ees_{UpDown}"] = Rpt(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
+          emevents[f"pt_cen_Deltapt_ees_{UpDown}"] = pt_cen(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/(Jet_collections[:,0] - Jet_collections[:,1]).pt
+  
+          #Electron Energy Reso
+          tmpElectron_collections = ak.copy(Electron_collections)
+          tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpFac
 #          tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpElectron_collections[f'dEsigma{UpDown}']/Electron_collections['eCorr']
 #          #Redo all Electron var
+          tmpemVar = tmpElectron_collections + Muon_collections
+          emevents[f'e_m_Mass_eer_{UpDown}'] = tmpemVar.mass
+          emevents[f"empt_eer_{UpDown}"] = tmpemVar.pt
+          emevents[f"DeltaEta_e_m_eer_{UpDown}"] = abs(Muon_collections.eta - tmpElectron_collections.eta)
+          emevents["DeltaPhi_em_met_eer_{UpDown}"] = tmpemVar.delta_phi(MET_collections)
+          emevents[f"DeltaEta_j1_em_eer_{UpDown}"] = abs(Jet_collections[:,0].eta - tmpemVar.eta)
+          emevents[f"DeltaEta_em_j1j2_eer_{UpDown}"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - tmpemVar.eta)
+          emevents[f"Zeppenfeld_DeltaEta_eer_{UpDown}"] = Zeppenfeld(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
+          emevents[f"Rpt_eer_{UpDown}"] = Rpt(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
+          emevents[f"pt_cen_Deltapt_eer_{UpDown}"] = pt_cen(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/(Jet_collections[:,0] - Jet_collections[:,1]).pt
   
   
           #Muon Energy Scale + Reso 
           tmpMuon_collections = ak.copy(Muon_collections)
-          tmpMuon_collections['mass'] = tmpMuon_collections['mass']*tmpMuon_collections[f'corrected{UpDown}_pt']/tmpMuon_collections['pt']
           tmpMuon_collections['pt'] = tmpMuon_collections[f'corrected{UpDown}_pt']
           #Redo all Muon var
           tmpemVar = Electron_collections + tmpMuon_collections
@@ -390,8 +428,8 @@ class MyEMuPeak(processor.ProcessorABC):
 
           #Unclustered
           tmpMET_collections = ak.copy(MET_collections)
-          tmpMET_collections['phi'] = emevents.MET[f'T1Smear_phi_unclustEn{UpDown}'] 
-          tmpMET_collections['pt'] = emevents.MET[f'T1Smear_pt_unclustEn{UpDown}'] 
+          tmpMET_collections['phi'] = emevents.MET[f'T1_phi_unclustEn{UpDown}'] 
+          tmpMET_collections['pt'] = emevents.MET[f'T1_pt_unclustEn{UpDown}'] 
   
           #Redo all MET var
           emevents[f"met_UnclusteredEn_{UpDown}"] = tmpMET_collections.pt
@@ -424,8 +462,8 @@ class MyEMuPeak(processor.ProcessorABC):
                tmpJet_collections = ak.pad_none(tmpJet_collections, 2, clip=True)
                #MET
                tmpMET_collections = ak.copy(emevents.MET)
-               tmpMET_collections['pt'] = emevents.MET[f'T1Smear_pt_{jetUncNoyear}{UpDown}']
-               tmpMET_collections['phi'] = emevents.MET[f'T1Smear_phi_{jetUncNoyear}{UpDown}']
+               tmpMET_collections['pt'] = emevents.MET[f'T1_pt_{jetUncNoyear}{UpDown}']
+               tmpMET_collections['phi'] = emevents.MET[f'T1_phi_{jetUncNoyear}{UpDown}']
                #Redo all Jet/MET var
                emevents[f"met_{jetUnc}_{UpDown}"] = tmpMET_collections.pt
 #               emevents[f"e_met_mT_{jetUnc}_{UpDown}"] = mT(Electron_collections, tmpMET_collections)

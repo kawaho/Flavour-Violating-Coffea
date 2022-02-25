@@ -12,9 +12,9 @@ metUnc = ['UnclusteredEn']
 jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal']
 jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
 sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
-sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017']
+sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017', 'mID', 'mIso', 'mTrg', 'eReco', 'eID']
 theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
-leptonUnc = ['me']#['ees', 'eer', 'me']
+leptonUnc = ['ees', 'eer', 'me']
 
 years = ['2016preVFP', '2016postVFP', '2017', '2018']
 
