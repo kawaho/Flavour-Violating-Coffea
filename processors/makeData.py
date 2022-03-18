@@ -157,7 +157,7 @@ class MyEMuPeak(processor.ProcessorABC):
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
 
-        massRange = (emVar.mass<160) & (emVar.mass>110)
+        massRange = (emVar.mass<180) & (emVar.mass>90)
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):

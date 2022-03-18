@@ -21,6 +21,7 @@ if __name__ == '__main__':
   parser.add_argument('-b', '--baseprocessor', type=str, default=None, help='processor tag')
   parser.add_argument('-r', '--remote', action='store_true', help='reading from remote sites')
   parser.add_argument('-s', '--subfix', type=str, default=None, help='output tag')
+  parser.add_argument('-bs', '-processorsubfix', type=str, default=None, help='processor tag')
   parser.add_argument('-y', '--year', type=str, default='2017', help='analysis year')
   parser.add_argument('-j', '--workers', type=int, default=200, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
   parser.add_argument('-c', '--nchunks', default=None, help='Max number of chunks to run')

@@ -77,8 +77,8 @@ class MyEMuPeak(processor.ProcessorABC):
         self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal']
         self.metUnc = ['UnclusteredEn']
         self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
-        self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016preVFP', '2016postVFP']], [])
-        self.sfUnc += ['pf_2016preVFP', 'pf_2016postVFP', 'pf_2017', 'mID', 'mIso', 'mTrg', 'eReco', 'eID']
+        self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016']], [])
+        self.sfUnc += ['pf_2016', 'pf_2017', 'mID', 'mIso', 'mTrg', 'eReco', 'eID']
         self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
         self.leptonUnc = ['ees', 'eer', 'me']
         self._accumulator = processor.dict_accumulator({})
@@ -90,6 +90,8 @@ class MyEMuPeak(processor.ProcessorABC):
         self._accumulator[f'mva'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'year'] = processor.column_accumulator(numpy.ubyte([]))
         self._accumulator[f'weight'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'mva_hist-herwig_GGcat'] = hist.Hist("Events", hist.Bin("mva", "mva", GG_quan))
+        self._accumulator[f'mva_hist-herwig_VBFcat'] = hist.Hist("Events", hist.Bin("mva", "mva", VBF_quan))
         for cat in ['GG_GGcat', 'GG_VBFcat', 'VBF_GGcat', 'VBF_VBFcat']:
           if 'VBFcat' in cat:
             self._accumulator[f'mva_hist-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", VBF_quan))
@@ -196,7 +198,7 @@ class MyEMuPeak(processor.ProcessorABC):
         Muon_collections = Muon_collections[:,0]
         emVar = Electron_collections + Muon_collections
 
-        massRange = (emVar.mass<160) & (emVar.mass>110)
+        massRange = (emVar.mass<180) & (emVar.mass>90)
         return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
     
     def SF(self, emevents):
@@ -267,12 +269,12 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents[f"weight_eReco_Down"] = SF*EleReco_SF_Down/EleReco_SF
         emevents[f"weight_eID_Down"] = SF*EleIDnoISO_SF_Down/EleIDnoISO_SF
 
-        for other_year in ['2016preVFP', '2016postVFP', '2017', '2018']:
+        for other_year in ['2016', '2017', '2018']:
           emevents[f"weight_bTag_{other_year}_Up"] = SF
           emevents[f"weight_bTag_{other_year}_Down"] = SF
           emevents[f"weight_pu_{other_year}_Up"] = SF
           emevents[f"weight_pu_{other_year}_Down"] = SF
-        for other_year in ['2016preVFP', '2016postVFP', '2017']:
+        for other_year in ['2016', '2017']:
           emevents[f"weight_pf_{other_year}_Up"] = SF
           emevents[f"weight_pf_{other_year}_Down"] = SF
 
@@ -296,17 +298,17 @@ class MyEMuPeak(processor.ProcessorABC):
 
         bTagSF_Down = ak.prod(1-btagSF_deepjet_L_down, axis=1)
         bTagSF_Up = ak.prod(1-btagSF_deepjet_L_up, axis=1)
-        emevents[f"weight_bTag_{self._year}_Up"] = SF*bTagSF_Up/bTagSF
-        emevents[f"weight_bTag_{self._year}_Down"] = SF*bTagSF_Down/bTagSF
+        emevents[f"weight_bTag_{self._jecYear}_Up"] = SF*bTagSF_Up/bTagSF
+        emevents[f"weight_bTag_{self._jecYear}_Down"] = SF*bTagSF_Down/bTagSF
 
         #PU Up/Down 
-        emevents[f"weight_pu_{self._year}_Up"] = SF*emevents.puWeightUp/emevents.puWeight
-        emevents[f"weight_pu_{self._year}_Down"] = SF*emevents.puWeightDown/emevents.puWeight
+        emevents[f"weight_pu_{self._jecYear}_Up"] = SF*emevents.puWeightUp/emevents.puWeight
+        emevents[f"weight_pu_{self._jecYear}_Down"] = SF*emevents.puWeightDown/emevents.puWeight
 
 	#Pre-firing Up/Down
         if self._year != '2018':
-          emevents[f"weight_pf_{self._year}_Up"] = SF*emevents.L1PreFiringWeight.Up/emevents.L1PreFiringWeight.Nom
-          emevents[f"weight_pf_{self._year}_Down"] = SF*emevents.L1PreFiringWeight.Dn/emevents.L1PreFiringWeight.Nom
+          emevents[f"weight_pf_{self._jecYear}_Up"] = SF*emevents.L1PreFiringWeight.Up/emevents.L1PreFiringWeight.Nom
+          emevents[f"weight_pf_{self._jecYear}_Down"] = SF*emevents.L1PreFiringWeight.Dn/emevents.L1PreFiringWeight.Nom
 
 	#Scale uncertainty
         emevents[f"weight_scalep5p5"] = SF*emevents.LHEScaleWeight[:,0]
@@ -329,11 +331,11 @@ class MyEMuPeak(processor.ProcessorABC):
           emevents["year"] = numpy.full(len(emevents), 1, dtype=numpy.ubyte)
         else:
           emevents["year"] = numpy.full(len(emevents), 2, dtype=numpy.ubyte)
-        if ('VBF' in emevents.metadata["dataset"]) and (not 'herwig' in emevents.metadata["dataset"]):
+        if ('VBF' in emevents.metadata["dataset"]) and (not 'H' in emevents.metadata["dataset"][-1]):
           emevents["isVBF"] = numpy.full(len(emevents), True, dtype=numpy.bool_) 
         else:
           emevents["isVBF"] = numpy.full(len(emevents), False, dtype=numpy.bool_) 
-        if 'herwig' in emevents.metadata["dataset"]:
+        if 'H' in emevents.metadata["dataset"][-1]:
           emevents["isHerwig"] = numpy.full(len(emevents), True, dtype=numpy.bool_) 
         else:
           emevents["isHerwig"] = numpy.full(len(emevents), False, dtype=numpy.bool_)
@@ -540,95 +542,105 @@ class MyEMuPeak(processor.ProcessorABC):
               acc = emevents[sys_var_].to_numpy()
               out[sys_var_].add( processor.column_accumulator( acc ) )
 
-          out[f'mva_hist-GG_GGcat'].fill(
-              mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f'mva'], 
-              weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)]["weight"]
-          )
-          out[f'mva_hist-GG_VBFcat'].fill(
-              mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f'mva'], 
-              weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)]["weight"]
-          )
-          out[f'mva_hist-VBF_GGcat'].fill(
-              mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f'mva'], 
-              weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)]["weight"]
-          )
-          out[f'mva_hist-VBF_VBFcat'].fill(
-              mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f'mva'], 
-              weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)]["weight"]
-          )
-          
-          for sys in self.jetUnc+self.jetyearUnc:
-            for UpDown in ['Up', 'Down']:
-              out[f'mva_hist_{sys}_{UpDown}-GG_GGcat'].fill(
-                  mva=emevents[(emevents.isVBF==0) & (emevents[f'isVBFcat_{sys}_{UpDown}']==0)][f'mva_{sys}_{UpDown}'], 
-                  weight=emevents[(emevents.isVBF==0) & (emevents[f'isVBFcat_{sys}_{UpDown}']==0)]["weight"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-GG_VBFcat'].fill(
-                  mva=emevents[(emevents.isVBF==0) & (emevents[f'isVBFcat_{sys}_{UpDown}']==1)][f'mva_{sys}_{UpDown}'], 
-                  weight=emevents[(emevents.isVBF==0) & (emevents[f'isVBFcat_{sys}_{UpDown}']==1)]["weight"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-VBF_GGcat'].fill(
-                  mva=emevents[(emevents.isVBF==1) & (emevents[f'isVBFcat_{sys}_{UpDown}']==0)][f'mva_{sys}_{UpDown}'], 
-                  weight=emevents[(emevents.isVBF==1) & (emevents[f'isVBFcat_{sys}_{UpDown}']==0)]["weight"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-VBF_VBFcat'].fill(
-                  mva=emevents[(emevents.isVBF==1) & (emevents[f'isVBFcat_{sys}_{UpDown}']==1)][f'mva_{sys}_{UpDown}'], 
-                  weight=emevents[(emevents.isVBF==1) & (emevents[f'isVBFcat_{sys}_{UpDown}']==1)]["weight"]
-              )
-
-          for sys in self.metUnc+self.leptonUnc:
-            for UpDown in ['Up', 'Down']:
-              out[f'mva_hist_{sys}_{UpDown}-GG_GGcat'].fill(
-                  mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f'mva_{sys}_{UpDown}'], 
-                  weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)]["weight"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-GG_VBFcat'].fill(
-                  mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f'mva_{sys}_{UpDown}'], 
-                  weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)]["weight"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-VBF_GGcat'].fill(
-                  mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f'mva_{sys}_{UpDown}'], 
-                  weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)]["weight"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-VBF_VBFcat'].fill(
-                  mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f'mva_{sys}_{UpDown}'], 
-                  weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)]["weight"]
-              )
-          for sys in self.sfUnc:
-            for UpDown in ['Up', 'Down']:
-              out[f'mva_hist_{sys}_{UpDown}-GG_GGcat'].fill(
-                  mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f'mva'], 
-                  weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f"weight_{sys}_{UpDown}"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-GG_VBFcat'].fill(
-                  mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f'mva'], 
-                  weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f"weight_{sys}_{UpDown}"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-VBF_GGcat'].fill(
-                  mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f'mva'], 
-                  weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f"weight_{sys}_{UpDown}"]
-              )
-              out[f'mva_hist_{sys}_{UpDown}-VBF_VBFcat'].fill(
-                  mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f'mva'], 
-                  weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f"weight_{sys}_{UpDown}"]
-              )
-          for sys in self.theoUnc:
-            out[f'mva_hist_{sys}-GG_GGcat'].fill(
+          if 'H' in emevents.metadata["dataset"][-1]: 
+            out[f'mva_hist-herwig_GGcat'].fill(
+                mva=emevents[emevents.isVBFcat==0][f'mva'], 
+                weight=emevents[emevents.isVBFcat==0]["weight"]
+            )
+            out[f'mva_hist-herwig_VBFcat'].fill(
+                mva=emevents[emevents.isVBFcat==1][f'mva'], 
+                weight=emevents[emevents.isVBFcat==1]["weight"]
+            )
+          else:
+            out[f'mva_hist-GG_GGcat'].fill(
                 mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f'mva'], 
-                weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f"weight_{sys}"]
+                weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)]["weight"]
             )
-            out[f'mva_hist_{sys}-GG_VBFcat'].fill(
+            out[f'mva_hist-GG_VBFcat'].fill(
                 mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f'mva'], 
-                weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f"weight_{sys}"]
+                weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)]["weight"]
             )
-            out[f'mva_hist_{sys}-VBF_GGcat'].fill(
+            out[f'mva_hist-VBF_GGcat'].fill(
                 mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f'mva'], 
-                weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f"weight_{sys}"]
+                weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)]["weight"]
             )
-            out[f'mva_hist_{sys}-VBF_VBFcat'].fill(
+            out[f'mva_hist-VBF_VBFcat'].fill(
                 mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f'mva'], 
-                weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f"weight_{sys}"]
+                weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)]["weight"]
             )
+            
+            for sys in self.jetUnc+self.jetyearUnc:
+              for UpDown in ['Up', 'Down']:
+                out[f'mva_hist_{sys}_{UpDown}-GG_GGcat'].fill(
+                    mva=emevents[(emevents.isVBF==0) & (emevents[f'isVBFcat_{sys}_{UpDown}']==0)][f'mva_{sys}_{UpDown}'], 
+                    weight=emevents[(emevents.isVBF==0) & (emevents[f'isVBFcat_{sys}_{UpDown}']==0)]["weight"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-GG_VBFcat'].fill(
+                    mva=emevents[(emevents.isVBF==0) & (emevents[f'isVBFcat_{sys}_{UpDown}']==1)][f'mva_{sys}_{UpDown}'], 
+                    weight=emevents[(emevents.isVBF==0) & (emevents[f'isVBFcat_{sys}_{UpDown}']==1)]["weight"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-VBF_GGcat'].fill(
+                    mva=emevents[(emevents.isVBF==1) & (emevents[f'isVBFcat_{sys}_{UpDown}']==0)][f'mva_{sys}_{UpDown}'], 
+                    weight=emevents[(emevents.isVBF==1) & (emevents[f'isVBFcat_{sys}_{UpDown}']==0)]["weight"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-VBF_VBFcat'].fill(
+                    mva=emevents[(emevents.isVBF==1) & (emevents[f'isVBFcat_{sys}_{UpDown}']==1)][f'mva_{sys}_{UpDown}'], 
+                    weight=emevents[(emevents.isVBF==1) & (emevents[f'isVBFcat_{sys}_{UpDown}']==1)]["weight"]
+                )
+  
+            for sys in self.metUnc+self.leptonUnc:
+              for UpDown in ['Up', 'Down']:
+                out[f'mva_hist_{sys}_{UpDown}-GG_GGcat'].fill(
+                    mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f'mva_{sys}_{UpDown}'], 
+                    weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)]["weight"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-GG_VBFcat'].fill(
+                    mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f'mva_{sys}_{UpDown}'], 
+                    weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)]["weight"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-VBF_GGcat'].fill(
+                    mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f'mva_{sys}_{UpDown}'], 
+                    weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)]["weight"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-VBF_VBFcat'].fill(
+                    mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f'mva_{sys}_{UpDown}'], 
+                    weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)]["weight"]
+                )
+            for sys in self.sfUnc:
+              for UpDown in ['Up', 'Down']:
+                out[f'mva_hist_{sys}_{UpDown}-GG_GGcat'].fill(
+                    mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f'mva'], 
+                    weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f"weight_{sys}_{UpDown}"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-GG_VBFcat'].fill(
+                    mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f'mva'], 
+                    weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f"weight_{sys}_{UpDown}"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-VBF_GGcat'].fill(
+                    mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f'mva'], 
+                    weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f"weight_{sys}_{UpDown}"]
+                )
+                out[f'mva_hist_{sys}_{UpDown}-VBF_VBFcat'].fill(
+                    mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f'mva'], 
+                    weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f"weight_{sys}_{UpDown}"]
+                )
+            for sys in self.theoUnc:
+              out[f'mva_hist_{sys}-GG_GGcat'].fill(
+                  mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f'mva'], 
+                  weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==0)][f"weight_{sys}"]
+              )
+              out[f'mva_hist_{sys}-GG_VBFcat'].fill(
+                  mva=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f'mva'], 
+                  weight=emevents[(emevents.isVBF==0) & (emevents.isVBFcat==1)][f"weight_{sys}"]
+              )
+              out[f'mva_hist_{sys}-VBF_GGcat'].fill(
+                  mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f'mva'], 
+                  weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==0)][f"weight_{sys}"]
+              )
+              out[f'mva_hist_{sys}-VBF_VBFcat'].fill(
+                  mva=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f'mva'], 
+                  weight=emevents[(emevents.isVBF==1) & (emevents.isVBFcat==1)][f"weight_{sys}"]
+              )
 
         else:
           print("No Events found in "+emevents.metadata["dataset"]) 
@@ -678,4 +690,5 @@ if __name__ == '__main__':
     GG_quan = numpy.load(f"results/SenScan/GGcat_quantiles",allow_pickle=True)
     processor_instance = MyEMuPeak(lumiWeight, BDTmodels, BDTvars, year, btag_sf, muon_sf, electron_sf, evaluator, VBF_quan, GG_quan)
     outname = os.path.basename(__file__).replace('.py','')
-    save(processor_instance, f'processors/{outname}_{year}.coffea')
+    for masspt in [120,125,130]:
+      save(processor_instance, f'processors/{outname}_{masspt}_{year}.coffea')
