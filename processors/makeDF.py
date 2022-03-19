@@ -5,64 +5,9 @@ from coffea.lookup_tools import extractor
 #from coffea.btag_tools import BTagScaleFactor
 import awkward as ak
 import correctionlib, numpy, json, os, sys
-
-def pZeta(leg1, leg2, MET_px, MET_py):
-    leg1x = numpy.cos(leg1.phi)
-    leg2x = numpy.cos(leg2.phi)
-    leg1y = numpy.sin(leg1.phi)
-    leg2y = numpy.sin(leg2.phi)
-    zetaX = leg1x + leg2x
-    zetaY = leg1y + leg2y
-    zetaR = numpy.sqrt(zetaX*zetaX + zetaY*zetaY)
-    
-    zetaX = numpy.where((zetaR > 0.), zetaX/zetaR, zetaX)
-    zetaY = numpy.where((zetaR > 0.), zetaY/zetaR, zetaY)
-    
-    visPx = leg1.px + leg2.px
-    visPy = leg1.py + leg2.py
-    pZetaVis = visPx*zetaX + visPy*zetaY
-    px = visPx + MET_px
-    py = visPy + MET_py
-    
-    pZeta = px*zetaX + py*zetaY
-    
-    return (pZeta, pZetaVis)
-
-def Rpt(lep1, lep2, jets=None):
-    emVar = lep1+lep2
-    if jets==None:
-        return (emVar).pt/(lep1.pt+lep2.pt)
-    elif len(jets)==1:
-        return (emVar + jets[0]).pt/(lep1.pt+lep2.pt+jets[0].pt)
-    elif len(jets)==2:
-        return (emVar + jets[0] +jets[1]).pt/(lep1.pt+lep2.pt+jets[0].pt+jets[1].pt)
-    else:
-        return -999
-    
-def Zeppenfeld(lep1, lep2, jets):
-    emVar = lep1+lep2
-    if len(jets)==1:
-        return emVar.eta - (jets[0].eta)/2
-    elif len(jets)==2:
-        return emVar.eta - (jets[0].eta + jets[1].eta)/2
-    else:
-        return -999
-
-def mT(met, lep1):
-    return numpy.sqrt(abs((numpy.sqrt(lep1.mass**2+lep1.pt**2) + met.pt)**2 - (lep1+met).pt**2))
-
-def mT3(met, lep1, lep2):
-    lep12 = lep1+lep2
-    return numpy.sqrt(abs((numpy.sqrt(lep12.mass**2+lep12.pt**2) + met.pt)**2 - (lep12+met).pt**2))
-
-def pt_cen(lep1, lep2, jets):
-    emVar = lep1+lep2
-    if len(jets)==1:
-        return emVar.pt - jets[0].pt/2
-    elif len(jets)==2:
-        return emVar.pt - (jets[0] + jets[1]).pt/2
-    else:
-        return -999
+from kinematics import *
+from Vetos import *
+from Corrections import *
 
 class MyDF(processor.ProcessorABC):
     def __init__(self, lumiWeight, year, btag_sf, muon_sf, electron_sf, evaluator):
@@ -93,179 +38,9 @@ class MyDF(processor.ProcessorABC):
     @property
     def accumulator(self):
         return self._accumulator
-    
-    def Vetos(self, events):
-        if self._year == '2016preVFP':
-          mpt_threshold = 26
-          trigger = events.HLT.IsoMu24 | events.HLT.IsoTkMu24
-        elif self._year == '2016postVFP':
-          mpt_threshold = 26
-          trigger = events.HLT.IsoMu24 | events.HLT.IsoTkMu24
-        elif self._year == '2017':
-          mpt_threshold = 29
-          trigger = events.HLT.IsoMu27
-        elif self._year == '2018':
-          mpt_threshold = 26
-          trigger = events.HLT.IsoMu24
 
-        #Choose em channel and IsoMu Trigger
-        emevents = events[(events.channel == 0) & (trigger == 1)]
-
-        E_collections = emevents.Electron
-        M_collections = emevents.Muon
-
-        #Kinematics Selections
-        emevents["Electron", "Target"] = ((E_collections.pt > 24) & (abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.05) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2noIso_WP80) & (E_collections.pfRelIso03_all < 0.1) & (E_collections.lostHits<2))
-        emevents["Muon", "Target"] = ((M_collections.pt > mpt_threshold) & (abs(M_collections.eta) < 2.4) & (abs(M_collections.dxy) < 0.05) & (abs(M_collections.dz) < 0.2) & (M_collections.tightId) & (M_collections.pfRelIso04_all < 0.15))
-
-        E_collections = emevents.Electron[emevents.Electron.Target==1]
-        M_collections = emevents.Muon[emevents.Muon.Target==1]
-
-        #Opposite Charge
-        E_charge = ak.fill_none(ak.pad_none(E_collections.charge, 1, axis=-1), 0, axis=-1)[:,0]
-        M_charge = ak.fill_none(ak.pad_none(M_collections.charge, 1, axis=-1), 0, axis=-1)[:,0]
-        opp_charge = E_charge*M_charge==-1
-        same_charge = E_charge*M_charge==1
-
-        emevents['opp_charge'] = opp_charge
-        emevents = emevents[opp_charge | same_charge]
-
-        #Trig Matching
-        M_collections = emevents.Muon
-        trg_collections = emevents.TrigObj
-
-        M_collections = M_collections[M_collections.Target==1]
-        #https://github.com/cms-sw/cmssw/blob/master/PhysicsTools/NanoAOD/python/triggerObjects_cff.py#L60
-        trg_collections = trg_collections[trg_collections.id == 13]
-
-        trg_Match = ak.any((M_collections[:,0].delta_r(trg_collections) < 0.5),1)
-
-        return emevents[trg_Match]
-
-    def Corrections(self, emevents):
-        Electron_collections = emevents.Electron[emevents.Electron.Target==1]
-        Muon_collections = emevents.Muon[emevents.Muon.Target==1]
-        MET_collections = emevents.MET
-        Jet_collections = emevents.Jet[emevents.Jet.passJet30ID==1]
-
-        #Jet corrections
-        Jet_collections['pt'] = Jet_collections['pt_nom']
-        Jet_collections['mass'] = Jet_collections['mass_nom']
-
-        #MET corrections
-        MET_collections['phi'] = MET_collections['T1_phi'] 
-        MET_collections['pt'] = MET_collections['T1_pt'] 
-
-        ##MET corrections Electron
-        #Electron_collections['pt'] = Electron_collections['pt']/Electron_collections['eCorr']
-        #MET_collections = MET_collections+Electron_collections[:,0]
-        #Electron_collections['pt'] = Electron_collections['pt']*Electron_collections['eCorr']
-        #MET_collections = MET_collections-Electron_collections[:,0]
-        
-        #Muon pT corrections
-        #MET_collections = MET_collections+Muon_collections[:,0]
-        Muon_collections['pt'] = Muon_collections['corrected_pt']
-        #MET_collections = MET_collections-Muon_collections[:,0]
-
-        #ensure Jets are pT-ordered
-        Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
-        #padding to have at least "2 jets"
-        Jet_collections = ak.pad_none(Jet_collections, 2, clip=True)
-        #Take the first leptons
-        Electron_collections = Electron_collections[:,0]
-        Muon_collections = Muon_collections[:,0]
-        emVar = Electron_collections + Muon_collections
-
-        #if emevents.metadata["dataset"] == 'SingleMuon' or emevents.metadata["dataset"] == 'data':
-        #    massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
-        #else:
-        massRange = (emVar.mass<160) & (emVar.mass>110)
-        return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
-    
-    def SF(self, emevents):
-        Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
-        Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
-          
-        if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
-          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==0 #numpy.ones(len(emevents))
-        else:
-          #Get bTag SF
-          #old btag
-          #btagSF_deepjet_L = self._btag_sf.eval("central", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
-          jet_flat = ak.flatten(emevents.Jet)
-          btagSF_deepjet_L = numpy.zeros(len(jet_flat))
-          jet_light = ak.where((jet_flat.passDeepJet_L) & (jet_flat.hadronFlavour==0))
-          jet_heavy = ak.where((jet_flat.passDeepJet_L) & (jet_flat.hadronFlavour!=0))
-          array_light = self._btag_sf["deepJet_incl"].evaluate("central", "L", jet_flat[jet_light].hadronFlavour.to_numpy(), abs(jet_flat[jet_light].eta).to_numpy(), jet_flat[jet_light].pt_nom.to_numpy())
-          array_heavy = self._btag_sf["deepJet_comb"].evaluate("central", "L", jet_flat[jet_heavy].hadronFlavour.to_numpy(), abs(jet_flat[jet_heavy].eta).to_numpy(), jet_flat[jet_heavy].pt_nom.to_numpy())
-          btagSF_deepjet_L[jet_light] = array_light
-          btagSF_deepjet_L[jet_heavy] = array_heavy
-          btagSF_deepjet_L = ak.unflatten(btagSF_deepjet_L, ak.num(emevents.Jet))
-          bTagSF = ak.prod(1-btagSF_deepjet_L, axis=1)
- 
-          #bTag/PU/Gen Weights
-          SF = bTagSF*emevents.puWeight*emevents.genWeight
-
-          #PU/PF/Gen Weights
-          if self._year != '2018':
-            SF = SF*emevents.L1PreFiringWeight.Nom
-            #SF = SF*emevents.PrefireWeight
-          #Zvtx
-          #if self._year == '2017':
-          #  SF = 0.991*SF
-  
-          #Muon SF
-          Muon_low = ak.mask(Muon_collections, Muon_collections['pt'] <= 120)
-          Muon_Hi = ak.mask(Muon_collections, Muon_collections['pt'] > 120)
-          Trk_SF = ak.fill_none(self._evaluator['trackerMu'](abs(Muon_low.eta), Muon_low.pt), 1)
-          Trk_SF_Hi = ak.fill_none(self._evaluator['trackerMu_Hi'](abs(Muon_Hi.eta), Muon_Hi.rho), 1)
-
-          if '2016' in self._year:
-            triggerstr = 'NUM_IsoMu24_or_IsoTkMu24_DEN_CutBasedIdTight_and_PFIsoTight'
-          elif self._year == '2017':
-            triggerstr = 'NUM_IsoMu27_DEN_CutBasedIdTight_and_PFIsoTight'
-          elif self._year == '2018':
-            triggerstr = 'NUM_IsoMu24_DEN_CutBasedIdTight_and_PFIsoTight'
-          MuTrigger_SF = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
-          MuID_SF = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
-          MuISO_SF = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
-
-          SF = SF*MuTrigger_SF*MuID_SF*MuISO_SF*Trk_SF*Trk_SF_Hi
-          #SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*Trk_SF*Trk_SF_Hi
-  
-          #Electron SF and lumi
-          EleReco_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","RecoAbove20", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
-          EleIDnoISO_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","wp80noiso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
-          SF = SF*EleReco_SF*EleIDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
-#          SF = SF*Electron_collections.Reco_SF*Electron_collections.IDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
-  
-          SF = SF.to_numpy()
-          SF[abs(SF)>10] = 0
-
-        #osss factor for QCD
-        emevents["njets"] = emevents.nJet30
-        emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
-        mpt = ak.mask(Muon_collections['pt'], emevents['opp_charge']!=1)
-        ept = ak.mask(Electron_collections['pt'], emevents['opp_charge']!=1)
-        dr = ak.mask(emevents["DeltaR_e_m"], emevents['opp_charge']!=1)
-        njets = ak.mask(emevents["njets"], emevents['opp_charge']!=1)
-
-        if '2016' in self._year:
-          QCDexp="((njets==0)*(2.852125+-0.282871*dr)+(njets==1)*(2.792455+-0.295163*dr)+(njets>=2)*(2.577038+-0.290886*dr))*ss_corr*os_corr"
-        elif '2017' in self._year:
-          QCDexp="((njets==0)*(3.221108+-0.374644*dr)+(njets==1)*(2.818298+-0.287438*dr)+(njets>=2)*(2.944477+-0.342411*dr))*ss_corr*os_corr"
-        elif '2018' in self._year:
-          QCDexp="((njets==0)*(2.042-0.05889**dr)+(njets==1)*(2.827-0.2907*dr)+(njets>=2)*(2.9-0.3641*dr))*ss_corr*os_corr"
-
-        ss_corr, os_corr = self._evaluator["hist_em_qcd_osss_ss_corr"](mpt, ept), self._evaluator["hist_em_qcd_osss_os_corr"](mpt, ept)
-        osss = ak.numexpr.evaluate(QCDexp) 
-
-        emevents["weight"] = SF*ak.fill_none(osss, 1, axis=-1)
-        emevents["is2016preVFP"] = numpy.ones(len(emevents)) if self._year == '2016preVFP' else numpy.zeros(len(emevents))
-        emevents["is2016postVFP"] = numpy.ones(len(emevents)) if self._year == '2016postVFP' else numpy.zeros(len(emevents))
-        emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))
-        emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
-
+    def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
+        #make interesting variables
         if 'LFV' in emevents.metadata["dataset"]:
           if '125' in emevents.metadata["dataset"]:
             emevents["label"] = numpy.ones(len(emevents)) 
@@ -277,20 +52,24 @@ class MyDF(processor.ProcessorABC):
           emevents["label"] = numpy.repeat(3, len(emevents))
         else:
           emevents["label"] = numpy.zeros(len(emevents))
-        
-        return emevents
-
-    def interesting(self, emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections):
-        #make interesting variables
+        emevents["is2016preVFP"] = numpy.ones(len(emevents)) if self._year == '2016preVFP' else numpy.zeros(len(emevents))
+        emevents["is2016postVFP"] = numpy.ones(len(emevents)) if self._year == '2016postVFP' else numpy.zeros(len(emevents))
+        emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))
+        emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
         emevents["sample"] = numpy.repeat(self._samples.index(emevents.metadata["dataset"]), len(emevents))
-        emevents["njets"] = emevents.nJet30
-        emevents["e_m_Mass"] = (Electron_collections + Muon_collections).mass
         emevents["e_m_Mass_reso"] = numpy.sqrt( (Muon_collections.energy*Electron_collections.energyErr)**2+(Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt)**2 ) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
         emevents["e_m_Mass_ereso"] = (Muon_collections.energy*Electron_collections.energyErr) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
         emevents["e_m_Mass_mreso"] = (Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
         emevents["lepCos"] = Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)
         emevents["e_deltaE"] = Electron_collections.energyErr
         emevents["m_deltapT"] = Muon_collections.ptErr
+        emVar = Electron_collections + Muon_collections
+        emevents["eEta"] = Electron_collections.eta
+        emevents["mEta"] = Muon_collections.eta
+        emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emevents["e_m_Mass"]
+        emevents["ept_Per_e_m_Mass"] = Electron_collections.pt/emevents["e_m_Mass"]
+        emevents["emEta"] = emVar.eta
+        emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
 #        Electron_collections = ak.zip(
 #    	{
 #          "pt":   Electron_collections.pt,
@@ -311,24 +90,14 @@ class MyDF(processor.ProcessorABC):
 #        )
 #        Electron_collections=Electron_collections/emevents["e_m_Mass"] 
 #        Muon_collections=Muon_collections/emevents["e_m_Mass"] 
-        emVar = Electron_collections + Muon_collections
-        emevents["eEta"] = Electron_collections.eta
-        emevents["mEta"] = Muon_collections.eta
 #        emevents["ePhi"] = Electron_collections.phi
 #        emevents["mPhi"] = Muon_collections.phi
         #emevents["eIso"] = Electron_collections.pfRelIso03_all
         #emevents["mIso"] = Muon_collections.pfRelIso04_all
-        emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emevents["e_m_Mass"]
-        emevents["ept_Per_e_m_Mass"] = Electron_collections.pt/emevents["e_m_Mass"]
-        emevents["empt"] = emVar.pt
-        emevents["emEta"] = emVar.eta
 #        emevents["emPhi"] = emVar.phi
-        emevents["DeltaEta_e_m"] = abs(Muon_collections.eta - Electron_collections.eta)
 #        emevents["DeltaPhi_e_m"] = Muon_collections.delta_phi(Electron_collections)
-        emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
 #        emevents["Rpt_0"] = Rpt(Muon_collections, Electron_collections)
 
-        emevents["met"] = MET_collections.pt
 #        emevents["metPhi"] = MET_collections.phi
 
         #emevents["e_met_mT"] = mT(MET_collections, Electron_collections)
@@ -339,7 +108,6 @@ class MyDF(processor.ProcessorABC):
         #emevents["e_m_met_mT_Per_e_m_Mass"] = emevents["e_m_met_mT"]/emevents["e_m_Mass"]
         emevents["DeltaPhi_e_met"] = Electron_collections.delta_phi(MET_collections)
         emevents["DeltaPhi_m_met"] = Muon_collections.delta_phi(MET_collections)
-        emevents["DeltaPhi_em_met"] = emVar.delta_phi(MET_collections)
 
         #pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  MET_collections.px,  MET_collections.py)
         #emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
@@ -347,10 +115,6 @@ class MyDF(processor.ProcessorABC):
         #emevents["pZeta"] = pZeta_
         #emevents["pZetaVis"] = pZetaVis_
 
-        emevents['j1pt'] = Jet_collections[:,0].pt
-        emevents['j1Eta'] = Jet_collections[:,0].eta
-
-        emevents["DeltaEta_j1_em"] = abs(Jet_collections[:,0].eta - emVar.eta)
 #        emevents["DeltaPhi_j1_em"] = Jet_collections[:,0].delta_phi(emVar)
         emevents["DeltaR_j1_em"] = Jet_collections[:,0].delta_r(emVar)
 
@@ -358,11 +122,8 @@ class MyDF(processor.ProcessorABC):
 #        emevents["Rpt_1"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0]])
 #        emevents["j1btagDeepFlavB"] = Jet_collections[:,0].btagDeepFlavB
 
-        emevents['j2pt'] = Jet_collections[:,1].pt
         emevents['j2Eta'] = Jet_collections[:,1].eta
-        emevents["j1_j2_mass"] = (Jet_collections[:,0] + Jet_collections[:,1]).mass
 
-        emevents["DeltaEta_em_j1j2"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - emVar.eta)
 #        emevents["DeltaPhi_em_j1j2"] = (Jet_collections[:,0] + Jet_collections[:,1]).delta_phi(emVar)
         emevents["DeltaR_em_j1j2"] = (Jet_collections[:,0] + Jet_collections[:,1]).delta_r(emVar)
 
@@ -370,25 +131,16 @@ class MyDF(processor.ProcessorABC):
 #        emevents["DeltaPhi_j2_em"] = Jet_collections[:,1].delta_phi(emVar)
         emevents["DeltaR_j2_em"] = Jet_collections[:,1].delta_r(emVar)
 
-        emevents["DeltaEta_j1_j2"] = abs(Jet_collections[:,0].eta - Jet_collections[:,1].eta)
-
-        emevents["isVBFcat"] = ((emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5))
-
 #        emevents["DeltaPhi_j1_j2"] = Jet_collections[:,0].delta_phi(Jet_collections[:,1])
         emevents["DeltaR_j1_j2"] = Jet_collections[:,0].delta_r(Jet_collections[:,1])
 
         emevents["Zeppenfeld"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
-        emevents["Zeppenfeld_DeltaEta"] = emevents["Zeppenfeld"]/emevents["DeltaEta_j1_j2"]
 #        emevents["absZeppenfeld_DeltaEta"] = abs(emevents["Zeppenfeld_DeltaEta"])
         emevents["cen"] = numpy.exp(-4*emevents["Zeppenfeld_DeltaEta"]**2)
 
-        emevents["Rpt"] = Rpt(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
-
         emevents["pt_cen"] = pt_cen(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
-        emevents["pt_cen_Deltapt"] = emevents["pt_cen"]/(Jet_collections[:,0] - Jet_collections[:,1]).pt
 #        emevents["abspt_cen_Deltapt"] = abs(emevents["pt_cen_Deltapt"])
 #        emevents["Ht"] = ak.sum(Jet_collections.pt, 1) + Muon_collections.pt + Electron_collections.pt
-        emevents["Ht_had"] = ak.sum(Jet_collections.pt, 1)
 
         #emevents["j2btagDeepFlavB"] = Jet_collections[:,1].btagDeepFlavB
         return emevents
@@ -396,10 +148,12 @@ class MyDF(processor.ProcessorABC):
     # we will receive a NanoEvents instead of a coffea DataFrame
     def process(self, events):
         out = self.accumulator.identity()
-        emevents = self.Vetos(events)
+        emevents = Vetos(self._year, events, sameCharge=True)
         if len(emevents)>0:
-          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = self.Corrections(emevents)
-          emevents = self.SF(emevents)
+          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents)
+          SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._evaluator)
+          emevents = SF_fun.evaluate(emevents, doQCD=True)
+          emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
 
           for var in self.var_ :

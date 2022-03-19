@@ -6,6 +6,8 @@ import glob, os, json, logging, argparse
 import find_samples
 import importlib
 import uproot
+import sys
+sys.path.insert(1, '/afs/crc.nd.edu/user/k/kho2/Flavour-Violating-Coffea/processors')
 uproot.open.defaults["xrootd_handler"] = uproot.source.xrootd.MultithreadedXRootDSource
 
 #logging.basicConfig(filename='_run_processor.log', level=logging.DEBUG, format='%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -44,6 +46,7 @@ if __name__ == '__main__':
     # use maximum resources seen, retry on maximum values if exhausted.
     'resource_monitor': True,
     'resources_mode': 'auto',
+    'extra_input_files': ['processors/kinematics.py', 'processors/BDT_functions.py', 'processors/Corrections.py', 'processors/Vetos.py'],
     #'extra_input_files': ['em_qcd_osss_2016.root', 'em_qcd_osss_2017.root', 'em_qcd_osss_2018.root'],
   #  # print messages when tasks are submitted, and as they return, their
   #  # resource allocation and usage.
