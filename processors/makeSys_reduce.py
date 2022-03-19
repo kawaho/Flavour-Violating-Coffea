@@ -97,7 +97,7 @@ class MyEMuPeak(processor.ProcessorABC):
           SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._evaluator)
           emevents = SF_fun.evaluate(emevents, doQCD=False, doSys=True)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
-          emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
+          emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections, doSys=True)
           BDT_fun = BDT_functions(self._BDTmodels, self.var_GG_, self.var_2jet_VBF_)
           emevents = BDT_fun.pandasDF(emevents)
           for sys in self.leptonUnc+self.metUnc:
