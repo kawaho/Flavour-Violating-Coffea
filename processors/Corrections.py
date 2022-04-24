@@ -207,6 +207,6 @@ def Corrections(emevents):
     #if emevents.metadata["dataset"] == 'SingleMuon' or emevents.metadata["dataset"] == 'data':
     #    massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
     #else:
-    massRange = (emVar.mass<160) & (emVar.mass>110)
+    massRange = (emVar.mass<170) & (emVar.mass>100)
     return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
 

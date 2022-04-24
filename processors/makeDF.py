@@ -179,7 +179,7 @@ if __name__ == '__main__':
 #  import find_samples
   years = ['2016preVFP', '2016postVFP', '2017', '2018']
   for year in years:
-    with open('lumi_'+year+'.json') as f:
+    with open('lumi_'+year+'_v9.json') as f:
       lumiWeight = json.load(f)
     if '2016' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2016.root"]

@@ -93,7 +93,6 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents = Vetos(self._year, events)
         if len(emevents)>0:
           emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents)
-          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents)
           SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._evaluator)
           emevents = SF_fun.evaluate(emevents, doQCD=False, doSys=True)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)

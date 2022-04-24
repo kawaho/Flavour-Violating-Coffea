@@ -70,7 +70,7 @@ if __name__ == '__main__':
     print ("Number of cores: %i"%ncpu)
     executor_args['workers'] = ncpu
 
-  with open(f'lumi_{args.year}.json') as f:
+  with open(f'lumi_{args.year}_v9.json') as f:
       lumiWeight = json.load(f)
 
   samples = {}
@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
   if args.remote:
     #read from wisc
-    with open(f'samples_{args.year}.json') as f:
+    with open(f'samples_{args.year}_v9.json') as f:
         all_samples = json.load(f)
     for samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
         samples[samples_shorthand] = all_samples[samples_shorthand]
