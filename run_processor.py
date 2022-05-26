@@ -19,13 +19,15 @@ if __name__ == '__main__':
 
   parser = argparse.ArgumentParser(description='Run coffea processors')
   parser.add_argument('-w', '--wq', action='store_true', help='Use work-queue to distribute')
+  parser.add_argument('-g', '--group', type=str, default=None, help='Run a group only')
   parser.add_argument('-t', '--test', action='store_true', help='Run on GG_LFV_125 for testing')
   parser.add_argument('-b', '--baseprocessor', type=str, default=None, help='processor tag')
   parser.add_argument('-r', '--remote', action='store_true', help='reading from remote sites')
   parser.add_argument('-s', '--subfix', type=str, default=None, help='output tag')
-  parser.add_argument('-bs', '-processorsubfix', type=str, default=None, help='processor tag')
+  parser.add_argument('-o', '--onejob', type=str, default=None, help='specify one job to run')
+  parser.add_argument('-bs', '--processorsubfix', type=str, default=None, help='processor tag')
   parser.add_argument('-y', '--year', type=str, default='2017', help='analysis year')
-  parser.add_argument('-j', '--workers', type=int, default=200, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
+  parser.add_argument('-j', '--workers', type=int, default=25, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
   parser.add_argument('-c', '--nchunks', default=None, help='Max number of chunks to run')
   args = parser.parse_args()
   nchunks = int(args.nchunks) if not args.nchunks is None else args.nchunks
@@ -62,29 +64,33 @@ if __name__ == '__main__':
 #    'cores': 1,
 #    'memory': 8000,
 #    'disk': 8000,
-    os.system("condor_submit_workers --cores 8 --memory 8000 --disk 4000 -M "+'{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year+" 25")
-
+    os.system("condor_submit_workers --cores 8 --memory 8000 --disk 4000 -M "+'{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year+f" {args.workers}")
   else:
     executor = processor.futures_executor  
     ncpu = int(os.cpu_count()/2)
     print ("Number of cores: %i"%ncpu)
     executor_args['workers'] = ncpu
 
-  with open(f'lumi_{args.year}_v9.json') as f:
+  with open(f'lumi_{args.year}.json') as f:
       lumiWeight = json.load(f)
 
   samples = {}
 
   if args.test:
     samples_to_run = ['GluGlu_LFV_HToEMu_M125']
+  elif args.onejob:
+    samples_to_run = [args.onejob]
+  elif args.group:
+    samples_to_run = find_samples.samples_to_run[args.group]
   else:
     samples_to_run = find_samples.samples_to_run[args.baseprocessor]
 
   if args.remote:
     #read from wisc
-    with open(f'samples_{args.year}_v9.json') as f:
+    with open(f'samples_{args.year}.json') as f:
         all_samples = json.load(f)
-    for samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
+    for samples_shorthand in samples_to_run:
+    #for samples_shorthand in find_samples.samples_to_run[args.baseprocessor]:
         samples[samples_shorthand] = all_samples[samples_shorthand]
   else:
     for samples_shorthand in lumiWeight:
@@ -114,6 +120,11 @@ if __name__ == '__main__':
   outputPath = f"./results/{args.year}/{args.baseprocessor}"
   Path(outputPath).mkdir(parents=True, exist_ok=True)
   if args.subfix:
-    save(result, f"{outputPath}/output_{args.subfix}.coffea")
+    if args.onejob:
+      save(result, f"{outputPath}/output_{args.subfix}_{args.onejob}.coffea")
+    elif args.group:
+      save(result, f"{outputPath}/output_{args.subfix}_{args.group}.coffea")
+    else:
+      save(result, f"{outputPath}/output_{args.subfix}.coffea")
   else:
     save(result, f"{outputPath}/output.coffea")

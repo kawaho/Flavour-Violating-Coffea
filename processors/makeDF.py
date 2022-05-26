@@ -19,7 +19,7 @@ class MyDF(processor.ProcessorABC):
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "e_m_Mass_reso", "e_m_Mass_ereso", "e_m_Mass_mreso", "lepCos", "e_deltaE", "m_deltapT", "met", "eEta", "mEta", "mpt_Per_e_m_Mass", "ept_Per_e_m_Mass", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "e_m_Mass_reso", "e_m_Mass_ereso", "e_m_Mass_mreso", "lepCos", "met", "eEta", "mEta", "mpt", "ept", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met", "e_mvaTTH", "m_mvaTTH", "e_mvaFall17V2Iso", "e_mvaFall17V2noIso"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaR_j1_em"]
         self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "Ht_had"]
         for var in self.var_ :
@@ -57,17 +57,23 @@ class MyDF(processor.ProcessorABC):
         emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))
         emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
         emevents["sample"] = numpy.repeat(self._samples.index(emevents.metadata["dataset"]), len(emevents))
+
+        lepCos = Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)
+
+        e_m_Mass_ereso = (Muon_collections.energy*Electron_collections.energyErr) * (1-lepCos) / emevents["e_m_Mass"]
+
+        e_m_Mass_mreso = (Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt) * (1-lepCos) / emevents["e_m_Mass"]
+
         emevents["e_m_Mass_reso"] = numpy.sqrt( (Muon_collections.energy*Electron_collections.energyErr)**2+(Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt)**2 ) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
-        emevents["e_m_Mass_ereso"] = (Muon_collections.energy*Electron_collections.energyErr) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
-        emevents["e_m_Mass_mreso"] = (Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
-        emevents["lepCos"] = Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)
-        emevents["e_deltaE"] = Electron_collections.energyErr
-        emevents["m_deltapT"] = Muon_collections.ptErr
+
+
+        emevents["m_mvaTTH"] = Muon_collections.mvaTTH
+
+        emevents["e_mvaTTH"] = Electron_collections.mvaTTH
+        emevents["e_mvaFall17V2noIso"] = Electron_collections.mvaFall17V2noIso
+        emevents["e_mvaFall17V2Iso"] = Electron_collections.mvaFall17V2Iso
+
         emVar = Electron_collections + Muon_collections
-        emevents["eEta"] = Electron_collections.eta
-        emevents["mEta"] = Muon_collections.eta
-        emevents["mpt_Per_e_m_Mass"] = Muon_collections.pt/emevents["e_m_Mass"]
-        emevents["ept_Per_e_m_Mass"] = Electron_collections.pt/emevents["e_m_Mass"]
         emevents["emEta"] = emVar.eta
         emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
 #        Electron_collections = ak.zip(
@@ -179,7 +185,7 @@ if __name__ == '__main__':
 #  import find_samples
   years = ['2016preVFP', '2016postVFP', '2017', '2018']
   for year in years:
-    with open('lumi_'+year+'_v9.json') as f:
+    with open('lumi_'+year+'.json') as f:
       lumiWeight = json.load(f)
     if '2016' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2016.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2016.root"]

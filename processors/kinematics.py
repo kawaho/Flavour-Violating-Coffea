@@ -64,6 +64,10 @@ def interestingKin(emevents, Electron_collections, Muon_collections, MET_collect
     emVar = Electron_collections + Muon_collections
     emevents["e_m_Mass"] = emVar.mass
     emevents["empt"] = emVar.pt
+    emevents["ept"] = Electron_collections.pt
+    emevents["mpt"] = Muon_collections.pt
+    emevents["eEta"] = Electron_collections.eta
+    emevents["mEta"] = Muon_collections.eta
     emevents["DeltaEta_e_m"] = abs(Muon_collections.eta - Electron_collections.eta)
     emevents["met"] = MET_collections.pt
     emevents["DeltaPhi_em_met"] = emVar.delta_phi(MET_collections)
@@ -80,6 +84,7 @@ def interestingKin(emevents, Electron_collections, Muon_collections, MET_collect
 
     #2 or more jets
     emevents['j2pt'] = Jet_collections[:,1].pt
+    emevents['j2Eta'] = Jet_collections[:,1].eta
     emevents["j1_j2_mass"] = (Jet_collections[:,0] + Jet_collections[:,1]).mass
     emevents["DeltaEta_em_j1j2"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - emVar.eta)
     emevents["DeltaEta_j1_j2"] = abs(Jet_collections[:,0].eta - Jet_collections[:,1].eta)

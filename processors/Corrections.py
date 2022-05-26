@@ -170,12 +170,11 @@ class SF:
     
         return emevents
 
-def Corrections(emevents):
+def Corrections(emevents, massrange=(100,170)):
     Electron_collections = emevents.Electron[emevents.Electron.Target==1]
     Muon_collections = emevents.Muon[emevents.Muon.Target==1]
     MET_collections = emevents.MET
     Jet_collections = emevents.Jet[emevents.Jet.passJet30ID==1]
-
     #Jet corrections
     Jet_collections['pt'] = Jet_collections['pt_nom']
     Jet_collections['mass'] = Jet_collections['mass_nom']
@@ -199,6 +198,7 @@ def Corrections(emevents):
     Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
     #padding to have at least "2 jets"
     Jet_collections = ak.pad_none(Jet_collections, 2, clip=True)
+
     #Take the first leptons
     Electron_collections = Electron_collections[:,0]
     Muon_collections = Muon_collections[:,0]
@@ -207,6 +207,6 @@ def Corrections(emevents):
     #if emevents.metadata["dataset"] == 'SingleMuon' or emevents.metadata["dataset"] == 'data':
     #    massRange = ((emVar.mass<115) & (emVar.mass>110)) | ((emVar.mass<160) & (emVar.mass>135))
     #else:
-    massRange = (emVar.mass<170) & (emVar.mass>100)
+    massRange = (emVar.mass<massrange[1]) & (emVar.mass>massrange[0])
     return emevents[massRange], Electron_collections[massRange], Muon_collections[massRange], MET_collections[massRange], Jet_collections[massRange]	
 
