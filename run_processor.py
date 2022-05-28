@@ -28,18 +28,27 @@ if __name__ == '__main__':
   parser.add_argument('-bs', '--processorsubfix', type=str, default=None, help='processor tag')
   parser.add_argument('-y', '--year', type=str, default='2017', help='analysis year')
   parser.add_argument('-j', '--workers', type=int, default=25, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
-  parser.add_argument('-c', '--nchunks', default=None, help='Max number of chunks to run')
+  parser.add_argument('-c', '--nchunks', type=int, default=None, help='Max number of chunks to run')
   args = parser.parse_args()
-  nchunks = int(args.nchunks) if not args.nchunks is None else args.nchunks
+
   executor_args = {"schema": NanoAODSchema, 'savemetrics': True, 'desc': f'Processing {args.baseprocessor} {args.year} '}#, 'config': htex}
 
+  substring = ""
+  if args.subfix:
+    substring+=f"_{args.subfix}"
+  if args.onejob:
+    substring+=f"_{args.onejob}"
+  if args.group:
+    substring+=f"_{args.group}"
+
   if args.wq:
+    master_name = '{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year+substring 
     executor = processor.work_queue_executor
     #print(f"Please submit: condor_submit_workers --cores 8 --memory 8000 --disk 4000 -M "+'{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year+" 25")
     executor_args = {
     "schema": NanoAODSchema, 
     # give the manager a name so workers can automatically find it:
-    'master_name': '{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year,
+    'master_name': master_name,
     # find a port to run work queue in this range (above 1024):
     'port': [9123,9130],
     # if not given, assume environment already setup at execution site
@@ -64,7 +73,7 @@ if __name__ == '__main__':
 #    'cores': 1,
 #    'memory': 8000,
 #    'disk': 8000,
-    os.system("condor_submit_workers --cores 8 --memory 8000 --disk 4000 -M "+'{}-wq-coffea-'.format(os.environ['USER'])+args.baseprocessor+'-'+args.year+f" {args.workers}")
+    os.system("condor_submit_workers --cores 8 --memory 8000 --disk 8000 -M "+master_name+f" {args.workers}")
   else:
     executor = processor.futures_executor  
     ncpu = int(os.cpu_count()/2)
@@ -112,19 +121,13 @@ if __name__ == '__main__':
       processor_instance,
       executor, 
       executor_args,
-      chunksize=20000,
-      maxchunks=nchunks 
+      maxchunks=args.nchunks,
+      chunksize=80000,
+      #dynamic_chunksize=True
+      #dynamic_chunksize=True
       #pre_executor,
       #pre_args
   )
   outputPath = f"./results/{args.year}/{args.baseprocessor}"
   Path(outputPath).mkdir(parents=True, exist_ok=True)
-  if args.subfix:
-    if args.onejob:
-      save(result, f"{outputPath}/output_{args.subfix}_{args.onejob}.coffea")
-    elif args.group:
-      save(result, f"{outputPath}/output_{args.subfix}_{args.group}.coffea")
-    else:
-      save(result, f"{outputPath}/output_{args.subfix}.coffea")
-  else:
-    save(result, f"{outputPath}/output.coffea")
+  save(result, f"{outputPath}/output"+substring+".coffea")

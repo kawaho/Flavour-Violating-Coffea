@@ -54,7 +54,9 @@ class SF:
             triggerstr = 'NUM_IsoMu27_DEN_CutBasedIdTight_and_PFIsoTight'
           elif self._year == '2018':
             triggerstr = 'NUM_IsoMu24_DEN_CutBasedIdTight_and_PFIsoTight'
-          MuTrigger_SF = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
+          Muon_pass = ak.mask(Muon_collections, emevents['mtrigger'])
+          
+          MuTrigger_SF = ak.where(emevents['mtrigger'], self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(ak.fill_none(Muon_pass.eta,2)).to_numpy(), ak.fill_none(Muon_pass.pt,30).to_numpy(), "sf"), numpy.ones(len(SF))) 
           MuID_SF = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
           MuISO_SF = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
     
@@ -197,7 +199,7 @@ def Corrections(emevents, massrange=(100,170)):
     #ensure Jets are pT-ordered
     Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
     #padding to have at least "2 jets"
-    Jet_collections = ak.pad_none(Jet_collections, 2, clip=True)
+    Jet_collections = ak.pad_none(Jet_collections, 2)
 
     #Take the first leptons
     Electron_collections = Electron_collections[:,0]

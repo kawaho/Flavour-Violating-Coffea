@@ -19,18 +19,19 @@ class MyDF(processor.ProcessorABC):
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "e_m_Mass_reso", "e_m_Mass_ereso", "e_m_Mass_mreso", "lepCos", "met", "eEta", "mEta", "mpt", "ept", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met", "e_mvaTTH", "m_mvaTTH", "e_mvaFall17V2Iso", "e_mvaFall17V2noIso"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "e_m_Mass_reso", "met", "eEta", "mEta", "mpt", "ept", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met", "e_mvaTTH", "m_mvaTTH", "e_mvaFall17V2Iso", "e_mvaFall17V2noIso", "mtrigger", "etrigger"]
         self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaR_j1_em"]
-        self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaR_j1_j2", "Zeppenfeld", "Zeppenfeld_DeltaEta", "cen", "Rpt", "pt_cen", "pt_cen_Deltapt", "Ht_had"]
-        for var in self.var_ :
-            self._accumulator[var+'_0jets'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[var+'_1jets'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
-        for var in self.var_1jet_ :
-            self._accumulator[var+'_1jets'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
-        for var in self.var_2jet_ :
-            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
+        self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaR_j1_j2", "Zeppenfeld_DeltaEta", "Rpt", "pt_cen_Deltapt", "Ht_had"]
+        for var in self.var_+self.var_1jet_+self.var_2jet_:
+            self._accumulator[var] = processor.column_accumulator(numpy.array([]))
+#            self._accumulator[var+'_0jets'] = processor.column_accumulator(numpy.array([]))
+#            self._accumulator[var+'_1jets'] = processor.column_accumulator(numpy.array([]))
+#            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
+#        for var in self.var_1jet_ :
+#            self._accumulator[var+'_1jets'] = processor.column_accumulator(numpy.array([]))
+#            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
+#        for var in self.var_2jet_ :
+#            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
 
     def sample_list(self, *argv):
         self._samples = argv
@@ -44,10 +45,9 @@ class MyDF(processor.ProcessorABC):
         if 'LFV' in emevents.metadata["dataset"]:
           if '125' in emevents.metadata["dataset"]:
             emevents["label"] = numpy.ones(len(emevents)) 
-          elif '130' in emevents.metadata["dataset"]:
-            emevents["label"] = numpy.repeat(130, len(emevents)) 
           else:
-            emevents["label"] = numpy.repeat(120, len(emevents)) 
+            mpoint = int(emevents.metadata["dataset"].split('_')[-1][1:4])
+            emevents["label"] = numpy.repeat(mpoint, len(emevents)) 
         elif emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
           emevents["label"] = numpy.repeat(3, len(emevents))
         else:
@@ -58,17 +58,33 @@ class MyDF(processor.ProcessorABC):
         emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
         emevents["sample"] = numpy.repeat(self._samples.index(emevents.metadata["dataset"]), len(emevents))
 
-        lepCos = Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)
+        tmpElectron_collections = ak.zip(
+          {
+            "pt":   Electron_collections.pt,
+            "eta":  Electron_collections.eta,
+            "phi":  Electron_collections.phi,
+            "mass": Electron_collections.mass
+          },
+          with_name="PtEtaPhiMLorentzVector",
+        )
+        tmpElectron_collections = tmpElectron_collections*(tmpElectron_collections.energy + Electron_collections.energyErr)/tmpElectron_collections.energy
 
-        e_m_Mass_ereso = (Muon_collections.energy*Electron_collections.energyErr) * (1-lepCos) / emevents["e_m_Mass"]
+        tmpMuon_collections = ak.zip(
+          {
+            "pt":   Muon_collections.pt,
+            "eta":  Muon_collections.eta,
+            "phi":  Muon_collections.phi,
+            "mass": Muon_collections.mass
+          },
+          with_name="PtEtaPhiMLorentzVector",
+        )
+        tmpMuon_collections['pt'] = tmpMuon_collections.pt + Muon_collections.ptErr
+        e_m_Mass_ereso = (Muon_collections + tmpElectron_collections).mass - emevents["e_m_Mass"]
+        e_m_Mass_mreso = (tmpMuon_collections + Electron_collections).mass - emevents["e_m_Mass"]
 
-        e_m_Mass_mreso = (Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt) * (1-lepCos) / emevents["e_m_Mass"]
-
-        emevents["e_m_Mass_reso"] = numpy.sqrt( (Muon_collections.energy*Electron_collections.energyErr)**2+(Electron_collections.energy*Muon_collections.energy*Muon_collections.ptErr/Muon_collections.pt)**2 ) * (1-Muon_collections.pvec.unit.dot(Electron_collections.pvec.unit)) / emevents["e_m_Mass"]
-
+        emevents["e_m_Mass_reso"] = numpy.sqrt( e_m_Mass_mreso**2+e_m_Mass_ereso**2 )
 
         emevents["m_mvaTTH"] = Muon_collections.mvaTTH
-
         emevents["e_mvaTTH"] = Electron_collections.mvaTTH
         emevents["e_mvaFall17V2noIso"] = Electron_collections.mvaFall17V2noIso
         emevents["e_mvaFall17V2Iso"] = Electron_collections.mvaFall17V2Iso
@@ -76,30 +92,11 @@ class MyDF(processor.ProcessorABC):
         emVar = Electron_collections + Muon_collections
         emevents["emEta"] = emVar.eta
         emevents["DeltaR_e_m"] = Muon_collections.delta_r(Electron_collections)
-#        Electron_collections = ak.zip(
-#    	{
-#          "pt":   Electron_collections.pt,
-#          "eta":  Electron_collections.eta,
-#          "phi":  Electron_collections.phi,
-#          "mass": Electron_collections.mass,
-#        },
-#          with_name="PtEtaPhiMLorentzVector",
-#        )
-#        Muon_collections = ak.zip(
-#    	{
-#          "pt":   Muon_collections.pt,
-#          "eta":  Muon_collections.eta,
-#          "phi":  Muon_collections.phi,
-#          "mass": Muon_collections.mass,
-#        },
-#          with_name="PtEtaPhiMLorentzVector",
-#        )
-#        Electron_collections=Electron_collections/emevents["e_m_Mass"] 
-#        Muon_collections=Muon_collections/emevents["e_m_Mass"] 
+
 #        emevents["ePhi"] = Electron_collections.phi
 #        emevents["mPhi"] = Muon_collections.phi
-        #emevents["eIso"] = Electron_collections.pfRelIso03_all
-        #emevents["mIso"] = Muon_collections.pfRelIso04_all
+#        emevents["eIso"] = Electron_collections.pfRelIso03_all
+#        emevents["mIso"] = Muon_collections.pfRelIso04_all
 #        emevents["emPhi"] = emVar.phi
 #        emevents["DeltaPhi_e_m"] = Muon_collections.delta_phi(Electron_collections)
 #        emevents["Rpt_0"] = Rpt(Muon_collections, Electron_collections)
@@ -140,11 +137,11 @@ class MyDF(processor.ProcessorABC):
 #        emevents["DeltaPhi_j1_j2"] = Jet_collections[:,0].delta_phi(Jet_collections[:,1])
         emevents["DeltaR_j1_j2"] = Jet_collections[:,0].delta_r(Jet_collections[:,1])
 
-        emevents["Zeppenfeld"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
+#        emevents["Zeppenfeld"] = Zeppenfeld(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
 #        emevents["absZeppenfeld_DeltaEta"] = abs(emevents["Zeppenfeld_DeltaEta"])
-        emevents["cen"] = numpy.exp(-4*emevents["Zeppenfeld_DeltaEta"]**2)
+#        emevents["cen"] = numpy.exp(-4*emevents["Zeppenfeld_DeltaEta"]**2)
 
-        emevents["pt_cen"] = pt_cen(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
+#        emevents["pt_cen"] = pt_cen(Muon_collections, Electron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
 #        emevents["abspt_cen_Deltapt"] = abs(emevents["pt_cen_Deltapt"])
 #        emevents["Ht"] = ak.sum(Jet_collections.pt, 1) + Muon_collections.pt + Electron_collections.pt
 
@@ -156,22 +153,27 @@ class MyDF(processor.ProcessorABC):
         out = self.accumulator.identity()
         emevents = Vetos(self._year, events, sameCharge=True)
         if len(emevents)>0:
-          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents)
+          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents, (110,160))
           SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._evaluator)
           emevents = SF_fun.evaluate(emevents, doQCD=True)
           emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
 
-          for var in self.var_ :
-              out[var+'_0jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 0][var].to_numpy() ) )
-              out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
-          for var in self.var_1jet_ :
-              out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
+          for var in self.var_+self.var_1jet_+self.var_2jet_ :
+            new_array = emevents[var].to_numpy()
+            if type(new_array)==numpy.ma.core.MaskedArray:
+              new_array = new_array.filled(numpy.nan)
+            out[var].add( processor.column_accumulator( new_array ) )
 
-          for var in self.var_2jet_ :
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
+#              out[var+'_0jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 0][var].to_numpy() ) )
+#              out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
+#              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
+#          for var in self.var_1jet_ :
+#              out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
+#              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
+#
+#          for var in self.var_2jet_ :
+#              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
  
         return out
 

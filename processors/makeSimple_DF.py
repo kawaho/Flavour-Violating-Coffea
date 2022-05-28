@@ -86,7 +86,7 @@ class MyDF(processor.ProcessorABC):
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["sample", "label", "weight", "mpt", "ept", "mtrigger", "etrigger"]
+        self.var_ = ["sample", "label", "weight", "mpt", "ept", "mtrigger", "etrigger", "e_m_Mass"]
         self.var_1jet_ = []
         self.var_2jet_ = []
         for var in self.var_ :
@@ -197,6 +197,7 @@ class MyDF(processor.ProcessorABC):
         emevents["sample"] = numpy.repeat(self._samples.index(emevents.metadata["dataset"]), len(emevents))
         emevents["ept"] = Electron_collections.pt
         emevents["mpt"] = Muon_collections.pt
+        emevents["e_m_Mass"] = (Electron_collections+Muon_collections).mass
         return emevents
 
     # we will receive a NanoEvents instead of a coffea DataFrame
@@ -204,7 +205,7 @@ class MyDF(processor.ProcessorABC):
         out = self.accumulator.identity()
         emevents = self.Vetos(self._year, events, sameCharge=True)
         if len(emevents)>0:
-          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents, massrange=(115,135))
+          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents, massrange=(0,1000))
           if len(emevents)>0:
             SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._evaluator)
             emevents = SF_fun.evaluate(emevents)

@@ -194,7 +194,7 @@ class MyEMuPeak(processor.ProcessorABC):
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
         #padding to have at least "2 jets"
-        Jet_collections = ak.pad_none(Jet_collections, 2, clip=True)
+        Jet_collections = ak.pad_none(Jet_collections, 2)
 
         #Take the first leptons
         Electron_collections = Electron_collections[:,0]
@@ -418,7 +418,7 @@ class MyEMuPeak(processor.ProcessorABC):
                #ensure Jets are pT-ordered
                tmpJet_collections = tmpJet_collections[ak.argsort(tmpJet_collections.pt, axis=1, ascending=False)]
                #padding to have at least "2 jets"
-               tmpJet_collections = ak.pad_none(tmpJet_collections, 2, clip=True)
+               tmpJet_collections = ak.pad_none(tmpJet_collections, 2)
                #MET
                tmpMET_collections = ak.copy(emevents.MET)
                tmpMET_collections['pt'] = emevents.MET[f'T1Smear_pt_{jetUncNoyear}{UpDown}']

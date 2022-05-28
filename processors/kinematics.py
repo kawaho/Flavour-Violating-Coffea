@@ -78,14 +78,14 @@ def interestingKin(emevents, Electron_collections, Muon_collections, MET_collect
 #     emevents["pZeta85"] = pZeta_ - 0.85*pZetaVis_
 
     #1 jet
-    emevents['j1pt'] = Jet_collections[:,0].pt
+    emevents['j1pt'] = ak.fill_none(Jet_collections[:,0].pt, 0)
     emevents['j1Eta'] = Jet_collections[:,0].eta
     emevents["DeltaEta_j1_em"] = abs(Jet_collections[:,0].eta - emVar.eta)
 
     #2 or more jets
-    emevents['j2pt'] = Jet_collections[:,1].pt
+    emevents['j2pt'] = ak.fill_none(Jet_collections[:,1].pt, 0)
     emevents['j2Eta'] = Jet_collections[:,1].eta
-    emevents["j1_j2_mass"] = (Jet_collections[:,0] + Jet_collections[:,1]).mass
+    emevents["j1_j2_mass"] = ak.fill_none((Jet_collections[:,0] + Jet_collections[:,1]).mass, 0)
     emevents["DeltaEta_em_j1j2"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - emVar.eta)
     emevents["DeltaEta_j1_j2"] = abs(Jet_collections[:,0].eta - Jet_collections[:,1].eta)
     emevents["isVBFcat"] = ((emevents["njets"] >= 2) & (emevents["j1_j2_mass"] > 400) & (emevents["DeltaEta_j1_j2"] > 2.5)) 
@@ -99,27 +99,46 @@ def interestingKin(emevents, Electron_collections, Muon_collections, MET_collect
     if doSys:
       for UpDown in ['Up', 'Down']:
         #Electron Energy Scale
-        tmpFac = 1.01 if UpDown=='Up' else 0.99
-        tmpElectron_collections = ak.copy(Electron_collections)
-        tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpFac
-        #tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpElectron_collections[f'dEscale{UpDown}']/Electron_collections['eCorr']
-        #Redo all Electron var
-        tmpemVar = tmpElectron_collections + Muon_collections
-        emevents[f'e_m_Mass_ees_{UpDown}'] = tmpemVar.mass
-        emevents[f"empt_ees_{UpDown}"] = tmpemVar.pt
-        emevents[f"DeltaEta_e_m_ees_{UpDown}"] = abs(Muon_collections.eta - tmpElectron_collections.eta)
-        emevents["DeltaPhi_em_met_ees_{UpDown}"] = tmpemVar.delta_phi(MET_collections)
-        emevents[f"DeltaEta_j1_em_ees_{UpDown}"] = abs(Jet_collections[:,0].eta - tmpemVar.eta)
-        emevents[f"DeltaEta_em_j1j2_ees_{UpDown}"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - tmpemVar.eta)
-        emevents[f"Zeppenfeld_DeltaEta_ees_{UpDown}"] = Zeppenfeld(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
-        emevents[f"Rpt_ees_{UpDown}"] = Rpt(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
-        emevents[f"pt_cen_Deltapt_ees_{UpDown}"] = pt_cen(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/(Jet_collections[:,0] - Jet_collections[:,1]).pt
+#        tmpFac = 1.01 if UpDown=='Up' else 0.99
+#        tmpElectron_collections = ak.copy(Electron_collections)
+#        tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpFac
+#
+#        tmpElectron_collections = ak.zip(
+#        {
+#          "pt":   Electron_collections.pt,
+#          "eta":  Electron_collections.eta,
+#          "phi":  Electron_collections.phi,
+#          "energy": Electron_collections.energy,
+#          "mass": Electron_collections.mass
+#        },
+#          with_name="PtEtaPhiELorentzVector",
+#        )
+#        tmpElectron_collections = tmpElectron_collections*tmpElectron_collections[f'dEscale{UpDown}']/tmpElectron_collections.energy
+#        #Redo all Electron var
+#        tmpemVar = tmpElectron_collections + Muon_collections
+#        emevents[f'e_m_Mass_ees_{UpDown}'] = tmpemVar.mass
+#        emevents[f"empt_ees_{UpDown}"] = tmpemVar.pt
+#        emevents[f"DeltaEta_e_m_ees_{UpDown}"] = abs(Muon_collections.eta - tmpElectron_collections.eta)
+#        emevents["DeltaPhi_em_met_ees_{UpDown}"] = tmpemVar.delta_phi(MET_collections)
+#        emevents[f"DeltaEta_j1_em_ees_{UpDown}"] = abs(Jet_collections[:,0].eta - tmpemVar.eta)
+#        emevents[f"DeltaEta_em_j1j2_ees_{UpDown}"] = abs((Jet_collections[:,0] + Jet_collections[:,1]).eta - tmpemVar.eta)
+#        emevents[f"Zeppenfeld_DeltaEta_ees_{UpDown}"] = Zeppenfeld(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
+#        emevents[f"Rpt_ees_{UpDown}"] = Rpt(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
+#        emevents[f"pt_cen_Deltapt_ees_{UpDown}"] = pt_cen(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/(Jet_collections[:,0] - Jet_collections[:,1]).pt
   
         #Electron Energy Reso
-        tmpElectron_collections = ak.copy(Electron_collections)
-        tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpFac
-        #tmpElectron_collections['pt'] = tmpElectron_collections['pt']*tmpElectron_collections[f'dEsigma{UpDown}']/Electron_collections['eCorr']
-         #Redo all Electron var
+        tmpElectron_collections = ak.zip(
+          {
+            "pt":   Electron_collections.pt,
+            "eta":  Electron_collections.eta,
+            "phi":  Electron_collections.phi,
+            "energy": Electron_collections.energy,
+            "mass": Electron_collections.mass
+          },
+          with_name="PtEtaPhiELorentzVector",
+        )
+        tmpElectron_collections = tmpElectron_collections*(Electron_collections[f'dEsigma{UpDown}']+tmpElectron_collections.energy)/tmpElectron_collections.energy
+        #Redo all Electron var
         tmpemVar = tmpElectron_collections + Muon_collections
         emevents[f'e_m_Mass_eer_{UpDown}'] = tmpemVar.mass
         emevents[f"empt_eer_{UpDown}"] = tmpemVar.pt
@@ -130,7 +149,6 @@ def interestingKin(emevents, Electron_collections, Muon_collections, MET_collect
         emevents[f"Zeppenfeld_DeltaEta_eer_{UpDown}"] = Zeppenfeld(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/emevents["DeltaEta_j1_j2"]
         emevents[f"Rpt_eer_{UpDown}"] = Rpt(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])
         emevents[f"pt_cen_Deltapt_eer_{UpDown}"] = pt_cen(Muon_collections, tmpElectron_collections, [Jet_collections[:,0], Jet_collections[:,1]])/(Jet_collections[:,0] - Jet_collections[:,1]).pt
-  
   
         #Muon Energy Scale + Reso 
         tmpMuon_collections = ak.copy(Muon_collections)
@@ -185,7 +203,7 @@ def interestingKin(emevents, Electron_collections, Muon_collections, MET_collect
              #ensure Jets are pT-ordered
              tmpJet_collections = tmpJet_collections[ak.argsort(tmpJet_collections.pt, axis=1, ascending=False)]
              #padding to have at least "2 jets"
-             tmpJet_collections = ak.pad_none(tmpJet_collections, 2, clip=True)
+             tmpJet_collections = ak.pad_none(tmpJet_collections, 2)
              #MET
              tmpMET_collections = ak.copy(emevents.MET)
              tmpMET_collections['pt'] = emevents.MET[f'T1_pt_{jetUncNoyear}{UpDown}']
@@ -197,11 +215,11 @@ def interestingKin(emevents, Electron_collections, Muon_collections, MET_collect
              #pZeta_, pZetaVis_ = pZeta(Muon_collections, Electron_collections,  tmpMET_collections.px,  tmpMET_collections.py)
              #emevents[f"pZeta85_{jetUnc}_{UpDown}"] = pZeta_ - 0.85*pZetaVis_
              emevents["DeltaPhi_em_met_{jetUnc}_{UpDown}"] = emVar.delta_phi(tmpMET_collections)
-             emevents[f'j1pt_{jetUnc}_{UpDown}'] = tmpJet_collections[:,0].pt
+             emevents[f'j1pt_{jetUnc}_{UpDown}'] = ak.fill_none(tmpJet_collections[:,0].pt, 0)
              emevents[f'j1Eta_{jetUnc}_{UpDown}'] = tmpJet_collections[:,0].eta
              emevents[f"DeltaEta_j1_em_{jetUnc}_{UpDown}"] = abs(tmpJet_collections[:,0].eta - emVar.eta)
-             emevents[f'j2pt_{jetUnc}_{UpDown}'] = tmpJet_collections[:,1].pt
-             emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] = (tmpJet_collections[:,0] + tmpJet_collections[:,1]).mass
+             emevents[f'j2pt_{jetUnc}_{UpDown}'] = ak.fill_none(tmpJet_collections[:,1].pt, 0)
+             emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] = ak.fill_none((tmpJet_collections[:,0] + tmpJet_collections[:,1]).mass, 0)
              emevents[f"DeltaEta_em_j1j2_{jetUnc}_{UpDown}"] = abs((tmpJet_collections[:,0] + tmpJet_collections[:,1]).eta - emVar.eta)
              emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"] = abs(tmpJet_collections[:,0].eta - tmpJet_collections[:,1].eta)
              emevents[f"isVBFcat_{jetUnc}_{UpDown}"] = ((emevents[f"njets_{jetUnc}_{UpDown}"] >= 2) & (emevents[f"j1_j2_mass_{jetUnc}_{UpDown}"] > 400) & (emevents[f"DeltaEta_j1_j2_{jetUnc}_{UpDown}"] > 2.5)) 

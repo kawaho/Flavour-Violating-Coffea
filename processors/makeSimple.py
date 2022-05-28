@@ -89,7 +89,7 @@ class MyEMuPeak(processor.ProcessorABC):
         #ensure Jets are pT-ordered
         Jet_collections = Jet_collections[ak.argsort(Jet_collections.pt, axis=1, ascending=False)]
         #padding to have at least "2 jets"
-        Jet_collections = ak.pad_none(Jet_collections, 2, clip=True)
+        Jet_collections = ak.pad_none(Jet_collections, 2)
 
         #Take the first leptons
         Electron_collections = Electron_collections[:,0]
