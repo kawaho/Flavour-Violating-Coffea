@@ -24,27 +24,21 @@ def bTagSF_fast(bTagSF, btagSF_deepjet, nbtag):
             bTagSF[i]=acc_hi
 
 class MyDF(processor.ProcessorABC):
-    def __init__(self, lumiWeight, year, btag_sf, muon_sf, electron_sf, evaluator):
+    def __init__(self, lumiWeight, year, btag_sf, muon_sf, electron_sf, electron_sf_pri, evaluator):
         self._samples = []
         self._lumiWeight = lumiWeight
         self._year = year
         self._btag_sf = btag_sf
         self._e_sf = electron_sf
+        self._e_sf_pri = electron_sf_pri
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "mEta", "mpt", "ept", "empt", "DeltaEta_e_m", "DeltaPhi_em_met"]
-        self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em"]
-        self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaEta_j1_j2", "Zeppenfeld_DeltaEta", "Rpt", "pt_cen_Deltapt", "Ht_had"]
-        for var in self.var_ :
-            self._accumulator[var+'_0jets'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[var+'_1jets'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
-        for var in self.var_1jet_ :
-            self._accumulator[var+'_1jets'] = processor.column_accumulator(numpy.array([]))
-            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
-        for var in self.var_2jet_ :
-            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "met", "eEta", "abseEta", "mEta", "absmEta", "mpt", "ept", "empt", "DeltaEta_e_m", "DeltaPhi_em_met"]
+        self.var_1jet_ = ["j1pt", "j1Eta", "absj1Eta", "DeltaEta_j1_em"]
+        self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "absj2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaEta_j1_j2", "Zeppenfeld_DeltaEta", "Rpt", "pt_cen_Deltapt", "Ht_had"]
+        for var in self.var_+self.var_1jet_+self.var_2jet_:
+            self._accumulator[var] = processor.column_accumulator(numpy.array([]))
 
     def sample_list(self, *argv):
         self._samples = argv
@@ -57,12 +51,9 @@ class MyDF(processor.ProcessorABC):
         Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
         Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
           
-        if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
-          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==2 #numpy.ones(len(emevents))
+        if 'data' in emevents.metadata["dataset"]: 
+          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==2
         else:
-          #Get bTag SF
-          #old btag
-          #btagSF_deepjet_L = self._btag_sf.eval("central", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
           jet_flat = ak.flatten(emevents.Jet)
           btagSF_deepjet_L = numpy.zeros(len(jet_flat))
           jet_light = ak.where((jet_flat.passDeepJet_L) & (jet_flat.hadronFlavour==0))
@@ -82,10 +73,6 @@ class MyDF(processor.ProcessorABC):
           #PU/PF/Gen Weights
           if self._year != '2018':
             SF = SF*emevents.L1PreFiringWeight.Nom
-            #SF = SF*emevents.PrefireWeight
-          #Zvtx
-          #if self._year == '2017':
-          #  SF = 0.991*SF
   
           #Muon SF
           Muon_low = ak.mask(Muon_collections, Muon_collections['pt'] <= 120)
@@ -99,18 +86,25 @@ class MyDF(processor.ProcessorABC):
             triggerstr = 'NUM_IsoMu27_DEN_CutBasedIdTight_and_PFIsoTight'
           elif self._year == '2018':
             triggerstr = 'NUM_IsoMu24_DEN_CutBasedIdTight_and_PFIsoTight'
-          MuTrigger_SF = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
+
+          Muon_pass = ak.mask(Muon_collections, emevents['mtrigger'])
+          MuTrigger_SF = ak.where(emevents['mtrigger'], self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(ak.fill_none(Muon_pass.eta,2)).to_numpy(), ak.fill_none(Muon_pass.pt,30).to_numpy(), "sf"), numpy.ones(len(SF))) 
           MuID_SF = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
           MuISO_SF = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
 
           SF = SF*MuTrigger_SF*MuID_SF*MuISO_SF*Trk_SF*Trk_SF_Hi
-          #SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*Trk_SF*Trk_SF_Hi
   
           #Electron SF and lumi
           EleReco_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","RecoAbove20", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
           EleIDnoISO_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","wp80noiso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
-          SF = SF*EleReco_SF*EleIDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
-#          SF = SF*Electron_collections.Reco_SF*Electron_collections.IDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
+          EleISO_SF = self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sf","Iso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+          Electron_pass = ak.mask(Electron_collections, (emevents['etrigger'] & ~emevents['mtrigger']))
+          if self._year == '2017':
+            EleTrig_SF = ak.where(emevents['etrigger'], 0.991*self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sf","Trig", ak.fill_none(Electron_pass.eta,2).to_numpy(), ak.fill_none(Electron_pass.pt,35).to_numpy()), numpy.ones(len(SF))) 
+          else:
+            EleTrig_SF = ak.where(emevents['etrigger'], self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sf","Trig", ak.fill_none(Electron_pass.eta,2).to_numpy(), ak.fill_none(Electron_pass.pt,35).to_numpy()), numpy.ones(len(SF))) 
+
+          SF = SF*EleISO_SF*EleTrig_SF*EleReco_SF*EleIDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
   
           SF = SF.to_numpy()
           SF[abs(SF)>10] = 0
@@ -142,15 +136,7 @@ class MyDF(processor.ProcessorABC):
         emevents["is2016postVFP"] = numpy.ones(len(emevents)) if self._year == '2016postVFP' else numpy.zeros(len(emevents))
         emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))
         emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
-
-        if 'LFV' in emevents.metadata["dataset"]:
-          if '125' in emevents.metadata["dataset"]:
-            emevents["label"] = numpy.ones(len(emevents)) 
-          elif '130' in emevents.metadata["dataset"]:
-            emevents["label"] = numpy.repeat(130, len(emevents)) 
-          else:
-            emevents["label"] = numpy.repeat(120, len(emevents)) 
-        elif emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
+        if 'data' in emevents.metadata["dataset"]: 
           emevents["label"] = numpy.repeat(3, len(emevents))
         else:
           emevents["label"] = numpy.zeros(len(emevents))
@@ -168,16 +154,11 @@ class MyDF(processor.ProcessorABC):
           emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
           emevents = self.interesting(emevents)
 
-          for var in self.var_ :
-              out[var+'_0jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 0][var].to_numpy() ) )
-              out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
-          for var in self.var_1jet_ :
-              out[var+'_1jets'].add( processor.column_accumulator( emevents[emevents.nJet30 == 1][var].to_numpy() ) )
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
-
-          for var in self.var_2jet_ :
-              out[var+'_2jets'].add( processor.column_accumulator( emevents[emevents.nJet30 >= 2][var].to_numpy() ) )
+          for var in self.var_+self.var_1jet_+self.var_2jet_ :
+            new_array = emevents[var].to_numpy()
+            if type(new_array)==numpy.ma.core.MaskedArray:
+              new_array = new_array.filled(numpy.nan)
+            out[var].add( processor.column_accumulator( new_array ) )
  
         return out
 
@@ -221,6 +202,7 @@ if __name__ == '__main__':
     btag_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/BTV/{year}_UL/btagging.json.gz")
     muon_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/MUO/{year}_UL/muon_Z.json.gz")
     electron_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/EGM/{year}_UL/electron.json.gz")
+    electron_sf_pri = correctionlib.CorrectionSet.from_file(f"ScaleFactorsJSON/{year}_UL/electron_hem.json")
     ext = extractor()
     ext.add_weight_sets(QCDhist)
     ext.add_weight_sets(TrackerMu)
@@ -228,6 +210,6 @@ if __name__ == '__main__':
     ext.finalize()
     evaluator = ext.make_evaluator()
 
-    processor_instance = MyDF(lumiWeight, year, btag_sf, muon_sf, electron_sf, evaluator)#, *find_samples.samples_to_run['makeDF'])
+    processor_instance = MyDF(lumiWeight, year, btag_sf, muon_sf, electron_sf, electron_sf_pri, evaluator)#, *find_samples.samples_to_run['makeDF'])
     outname = os.path.basename(__file__).replace('.py','')
     save(processor_instance, f'processors/{outname}_{year}.coffea')

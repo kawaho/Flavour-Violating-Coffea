@@ -13,14 +13,15 @@ class MyEMuPeak(processor.ProcessorABC):
         self._lumiWeight = lumiWeight
         self._BDTmodels = BDTmodels
         self._year = year
-        self.var_GG_ = BDTvars['model_GG']
-        self.var_2jet_VBF_ = BDTvars['model_VBF']
+        self.var_GG_ = BDTvars['model_gg_v9']
+        self.var_2jet_VBF_ = BDTvars['model_vbf_v9']
         self._accumulator = processor.dict_accumulator({})
         self._accumulator[f'e_m_Mass'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'mva'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'ept'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'mpt'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'isVBFcat'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'njets'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'weight'] = processor.column_accumulator(numpy.array([]))
   
     @property
     def accumulator(self):
@@ -30,11 +31,11 @@ class MyEMuPeak(processor.ProcessorABC):
     def process(self, events):
         out = self.accumulator.identity()
         emevents = Vetos(self._year, events)
+        emevents = emevents[ak.sum(emevents.Jet.passDeepJet_L,1)==0]
         if len(emevents)==0: return out
         emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents)
-        if len(emevents)==0: return out
-        emevents['weight'] = ak.sum(emevents.Jet.passDeepJet_L,1)==0 
         emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
+        if len(emevents)==0: return out
         BDT_fun = BDT_functions(self._BDTmodels, self.var_GG_, self.var_2jet_VBF_)
         emevents = BDT_fun.pandasDF(emevents)
         for sys_var_ in out:
@@ -48,12 +49,15 @@ class MyEMuPeak(processor.ProcessorABC):
         return accumulator
 
 if __name__ == '__main__':
-  BDTjsons = ['model_GG', 'model_VBF']
+  BDTjsons = ['model_gg_v9', 'model_vbf_v9']
   BDTmodels = {}
   BDTvars = {}
   for BDTjson in BDTjsons:
     BDTmodels[BDTjson] = xgb.XGBClassifier()
-    BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/{BDTjson}.json')
+    if 'gg' in BDTjson:
+      BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/model_gg_v9_og.json')
+    else:
+      BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/{BDTjson}.json')
     BDTvars[BDTjson] = BDTmodels[BDTjson].get_booster().feature_names
 
     print(BDTmodels[BDTjson].get_booster().feature_names)

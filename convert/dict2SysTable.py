@@ -18,6 +18,8 @@ leptonUnc = ['me']#['ees', 'eer', 'me']
 
 years = ['2016preVFP', '2016postVFP', '2017', '2018']
 
+BRcorr = {'120':{'GG':45.14/52.22, 'VBF':4.086/3.935}, '125':{'GG':41.98/48.61, 'VBF':3.925/3.766}, '130':{'GG':39.14/45.31, 'VBF':3.773/3.637}}
+
 #Create dataframe for systematics: mva_sys/weight_sys/....etc 
 df_year = []
 for year in years:
@@ -100,7 +102,7 @@ for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_
     #mc
     datasets = []
     e_m_Mass = df_gg_vbf_deep[f'e_m_Mass'].to_numpy()
-    weight = df_gg_vbf_deep['weight'].to_numpy()
+    weight = df_gg_vbf_deep['weight'].to_numpy()*BRcorr
     mva = df_gg_vbf_deep['mva'].to_numpy()
     uproot_tree_dict_dtype = {'CMS_emu_Mass': e_m_Mass.dtype, 'mva': mva.dtype, 'weight': weight.dtype}
     uproot_tree_dict = {'CMS_emu_Mass': e_m_Mass, 'mva': mva, 'weight': weight}

@@ -3,31 +3,46 @@ def Vetos(_year, events, sameCharge=False):
     if _year == '2016preVFP':
       events['mtrigger'] = events.HLT.IsoMu24 | events.HLT.IsoTkMu24
       events['etrigger'] = events.HLT.Ele27_WPTight_Gsf
+      #mpt_threshold = (26, 20)
+      #ept_threshold = (25, 29)
       mpt_threshold = (26, 15)
       ept_threshold = (20, 29)
     elif _year == '2016postVFP':
       events['mtrigger'] = events.HLT.IsoMu24 | events.HLT.IsoTkMu24
       events['etrigger'] = events.HLT.Ele27_WPTight_Gsf
+      #mpt_threshold = (26, 20)
+      #ept_threshold = (25, 29)
       mpt_threshold = (26, 15)
       ept_threshold = (20, 29)
     elif _year == '2017':
       events['mtrigger'] = events.HLT.IsoMu27
-      events['etrigger'] = events.HLT.Ele35_WPTight_Gsf
+      events['etrigger'] = events.HLT.Ele32_WPTight_Gsf_L1DoubleEG
+      #mpt_threshold = (29, 20)
+      #ept_threshold = (25, 34)
       mpt_threshold = (29, 15)
-      ept_threshold = (20, 37)
+      ept_threshold = (20, 34)
     elif _year == '2018':
       events['mtrigger'] = events.HLT.IsoMu24
       events['etrigger'] = events.HLT.Ele32_WPTight_Gsf
+      #mpt_threshold = (26, 20)
+      #ept_threshold = (25, 34)
       mpt_threshold = (26, 15)
       ept_threshold = (20, 34)
 
     #Choose em channel and IsoMu+IsoEle Trigger
-    emevents = events[(events.channel == 0) & (events.mtrigger|events.etrigger)]
+    if events.metadata["dataset"]=='dataE':
+      emevents = events[(events.channel == 0) & (~events.mtrigger) & events.etrigger]
+    elif events.metadata["dataset"]=='data':
+      emevents = events[(events.channel == 0) & events.mtrigger ]
+    else:
+      emevents = events[(events.channel == 0) & (events.mtrigger|events.etrigger)]
+    #emevents = events[(events.channelIso == 0) & (events.mtrigger|events.etrigger)]
     E_collections = emevents.Electron
     M_collections = emevents.Muon
 
     #Kinematics Selections
-    E_collections.Target = ((abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.05) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2noIso_WP80) & (E_collections.pfRelIso03_all < 0.1) & (E_collections.lostHits<2))
+    #E_collections.Target = ((abs(E_collections.eta) < 2.5) & (abs(E_collections.dxy) < 0.05) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2Iso_WP80) & (E_collections.lostHits<2))
+    E_collections.Target = ((abs(E_collections.eta) < 2.5) & ~((abs(E_collections.eta) < 1.566) & (abs(E_collections.eta) > 1.4442)) & (abs(E_collections.dxy) < 0.05) & (abs(E_collections.dz) < 0.2) & (E_collections.convVeto) & (E_collections.mvaFall17V2noIso_WP80) & (E_collections.pfRelIso03_all < 0.1) & (E_collections.lostHits<2))
     M_collections.Target = ((abs(M_collections.eta) < 2.4) & (abs(M_collections.dxy) < 0.05) & (abs(M_collections.dz) < 0.2) & (M_collections.tightId) & (M_collections.pfRelIso04_all < 0.15))
 
     #Apply pT cut according to trigger types
@@ -47,7 +62,11 @@ def Vetos(_year, events, sameCharge=False):
     #Electron Trig Matching
     E_collections = E_collections[emevents.Electron.Target_e==1]
     E_collections = ak.pad_none(E_collections, 1, axis=-1)
-    trg_collections = emevents.TrigObj[emevents.TrigObj.id == 11]
+    
+    if _year == '2017':
+      trg_collections = emevents.TrigObj[(emevents.TrigObj.id == 11) & ((emevents.TrigObj.filterBits)&(1<<10)!=0)]
+    else:
+      trg_collections = emevents.TrigObj[emevents.TrigObj.id == 11]
     etrg_Match = (ak.any((E_collections[:,0].delta_r(trg_collections) < 0.5),1) & emevents.etrigger)
     etrg_Match = ak.fill_none(etrg_Match, False)
 
@@ -56,10 +75,15 @@ def Vetos(_year, events, sameCharge=False):
 
     emevents['mtrigger'], emevents['etrigger'] = mtrg_Match, etrg_Match
 
-    emevents = emevents[(emevents.mtrigger|emevents.etrigger)]
-
+    if emevents.metadata["dataset"]=='dataE':
+      emevents = emevents[(~emevents.mtrigger)&emevents.etrigger]
+    elif emevents.metadata["dataset"]=='data':
+      emevents = emevents[emevents.mtrigger]
+    else:
+      emevents = emevents[(emevents.mtrigger|emevents.etrigger)]
     E_collections = emevents.Electron[emevents.Electron.Target==1]
     M_collections = emevents.Muon[emevents.Muon.Target==1]
+
 
     #Opposite Charge
     E_charge = ak.fill_none(ak.pad_none(E_collections.charge, 1, axis=-1), 0, axis=-1)[:,0]
@@ -72,14 +96,5 @@ def Vetos(_year, events, sameCharge=False):
       emevents = emevents[opp_charge | same_charge]
     else:
       emevents = emevents[opp_charge]
-    #Trig Matching
-    M_collections = emevents.Muon
-    trg_collections = emevents.TrigObj
 
-    M_collections = M_collections[M_collections.Target==1]
-    #https://github.com/cms-sw/cmssw/blob/master/PhysicsTools/NanoAOD/python/triggerObjects_cff.py#L60
-    trg_collections = trg_collections[trg_collections.id == 13]
-
-    trg_Match = ak.any((M_collections[:,0].delta_r(trg_collections) < 0.5),1)
-
-    return emevents[trg_Match]
+    return emevents

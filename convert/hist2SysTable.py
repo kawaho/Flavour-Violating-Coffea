@@ -1,7 +1,8 @@
 from coffea.util import load
+import coffea.hist
 from statsmodels.stats.weightstats import DescrStatsW
 from collections import defaultdict
-import uproot3
+import uproot
 import numpy as np
 import pandas as pd
 import glob, os, json, argparse
@@ -12,13 +13,14 @@ metUnc = ['UnclusteredEn']
 jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal']
 jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
 sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016']], [])
-sfUnc += ['pf_2016', 'pf_2017', 'mID', 'mIso', 'mTrg', 'eReco', 'eID']
+sfUnc += ['pf_2016', 'pf_2017', 'mID', 'mIso', 'mTrg', 'eTrig', 'eIso', 'eReco', 'eID']
 theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
-leptonUnc = ['ees', 'eer', 'me']
+leptonUnc = ['ess', 'me']#'ees', 'eer'
 
 years = ['2016preVFP', '2016postVFP', '2017', '2018']
+BRcorr = {120:{'GG':45.14/52.22, 'VBF':4.086/3.935}, 125:{'GG':41.98/48.61, 'VBF':3.925/3.766}, 130:{'GG':39.14/45.31, 'VBF':3.773/3.637}}
 
-for masspt in [120,125,130]:  
+for masspt in [125]:#, 110, 120, 130, 140, 150, 160]:  
   #Create dataframe for systematics: mva_sys/weight_sys/....etc 
   var_dict = {}
   hist_dict = {}
@@ -26,12 +28,11 @@ for masspt in [120,125,130]:
   weight_year = {i:[] for i in cats}
   for year in years:
     print(f'Processing {year}')
-    result = load(f"results/{year}/makeSys_reduce_{masspt}/output_herwig.coffea")
+    result = load(f"results/{year}/makeSys_reduce/output_v9_signal_{masspt}.coffea")
     if isinstance(result,tuple):
         result = result[0]
     for cat in cats:
       weight_year[cat].append(result[f'mva_hist-{cat}'].values()[()])
-      print(masspt, year, cat, result[f'mva_hist-{cat}'].values()[()].sum())
     for varName in result:
       if 'hist' in varName:
         if varName in hist_dict:
@@ -47,7 +48,6 @@ for masspt in [120,125,130]:
   #Get total weight of all years for acceptance calculations
   theory_total_weight = {}
   df = pd.DataFrame(var_dict)
-  
   for c in ['GG', 'VBF']:
     theory_total_weight[f"weight_{c}"] = sum(hist_dict[f'mva_hist-{c}_VBFcat'])+sum(hist_dict[f'mva_hist-{c}_GGcat'])
     theory_total_weight[f"weight_scalep5p5_{c}"] = sum(hist_dict[f'mva_hist_scalep5p5-{c}_VBFcat'])+sum(hist_dict[f'mva_hist_scalep5p5-{c}_GGcat'])
@@ -59,65 +59,60 @@ for masspt in [120,125,130]:
   #Separate into two dataframe: one for VBF cat and GG cat
   df_ggcat, df_vbfcat = df[(df['isVBFcat']==0)&(df['isHerwig']==0)], df[(df['isVBFcat']==1)&(df['isHerwig']==0)]
   
-  #Repeat for data
-  if masspt==125:
-    var_dict_data = {}
-    for year in years:
-      print(f'Processing {year}')
-      result = load(f"results/{year}/makeData/output.coffea")
-      if isinstance(result,tuple):
-          result = result[0]
-      for varName in result:
-        if varName in var_dict_data:
-          var_dict_data[varName] = np.append(var_dict_data[varName],result[varName].value, axis=0)
-        else:
-          var_dict_data[varName] = result[varName].value
-      df_data = pd.DataFrame(var_dict_data)
-      df_data = df_data[df_data['weight']!=0]
-    df_ggcat_data, df_vbfcat_data = df_data[(df_data['isVBFcat']==0)], df_data[(df_data['isVBFcat']==1)]
-  else:
-    df_ggcat_data, df_vbfcat_data = -1, -1
-  
   #Create dataframe for fast calulcations of systematics
-  for df_gg_vbf, df_gg_vbf_data, whichcat in zip([df_ggcat, df_vbfcat], [df_ggcat_data, df_vbfcat_data], ['GGcat', 'VBFcat']):
+  for df_gg_vbf, whichcat in zip([df_ggcat, df_vbfcat], ['GGcat', 'VBFcat']):
     print(f'Running {whichcat}')
     #Get mva values corresponding to 100 quantiles 
-    quantiles = np.load(f"results/SenScan/{whichcat}_quantiles",allow_pickle=True)
-    #Create tree for mva/weight/e_m_Mass
-    datasets = []
-    if masspt==125:
-      e_m_Mass = df_gg_vbf_data[f'e_m_Mass'].to_numpy()
-      mva = df_gg_vbf_data['mva'].to_numpy()
-      with uproot3.recreate(f"results/SenScan/{whichcat}_tree.root") as f:
-        f['tree'] = uproot3.newtree({'CMS_emu_Mass': e_m_Mass.dtype, 'mva': mva.dtype})
-        f['tree'].extend({'CMS_emu_Mass': e_m_Mass, 'mva': mva})
-  
+    quantiles = np.arange(0,1.01,0.01) #np.load(f"results/SenScan_v9/{whichcat}_quantiles",allow_pickle=True)
+
     #Divide into GG/VBF
     for df_gg_vbf_deep, whichcat_deep in zip([df_gg_vbf[df_gg_vbf['isVBF']==0], df_gg_vbf[df_gg_vbf['isVBF']==1]], ['GG', 'VBF']):
       print(f'Running {whichcat_deep} {masspt}')
       quan_dict = defaultdict(list)
   
       #Create tree for mva/weight/e_m_Mass/lep scale/smearing
+      fsig = uproot.recreate(f"results/SenScan_v9/{whichcat_deep}_{whichcat}_{masspt}_tree.root")
       #mc
-      datasets = []
-      e_m_Mass = df_gg_vbf_deep[f'e_m_Mass'].to_numpy()
-      weight = df_gg_vbf_deep['weight'].to_numpy()
-      mva = df_gg_vbf_deep['mva'].to_numpy()
-      uproot_tree_dict_dtype = {'CMS_emu_Mass': e_m_Mass.dtype, 'mva': mva.dtype, 'weight': weight.dtype}
-      uproot_tree_dict = {'CMS_emu_Mass': e_m_Mass, 'mva': mva, 'weight': weight}
-      e_m_Mass_sys, mva_sys = [], []
+#histogram
+#      h = [] 
+#      e_m_Mass = df_gg_vbf_deep[f'e_m_Mass'].to_numpy()
+#      weight = df_gg_vbf_deep['weight'].to_numpy()
+#      mva = df_gg_vbf_deep['mva'].to_numpy()
+#
+#      h.append(coffea.hist.Hist("nominal",
+#                     coffea.hist.Bin("e_m_Mass", "e_m_Mass", 70000, 100, 170),
+#                     coffea.hist.Bin("mva", "mva", 100, 0, 1),
+#                     ))
+#      fillContent = {'CMS_emu_Mass': e_m_Mass, 'mva': mva, 'weight': weight}
+#      h[-1].fill(**fillContent)
+#      fsig['nominal'] = h[-1].to_hist()
+
+      groups = df_gg_vbf_deep.groupby(pd.cut(df_gg_vbf_deep.mva, quantiles))
+
+      for i, group in enumerate(groups):
+        if masspt in [120,125,130]:
+          fsig[f'tree_{i+1}'] = {'CMS_emu_Mass': group[1].e_m_Mass.to_numpy(), 'weight': group[1]['weight'].to_numpy()*BRcorr[masspt][whichcat_deep]}
+        else:
+          fsig[f'tree_{i+1}'] = {'CMS_emu_Mass': group[1].e_m_Mass.to_numpy(), 'weight': group[1]['weight'].to_numpy()}
+#      e_m_Mass_sys, mva_sys = [], []
       for sys in leptonUnc:
         for UpDown in ['Up', 'Down']:
-          e_m_Mass_sys.append(df_gg_vbf_deep[f'e_m_Mass_{sys}_{UpDown}'].to_numpy())
-          mva_sys.append(df_gg_vbf_deep[f'mva_{sys}_{UpDown}'].to_numpy())
-          uproot_tree_dict_dtype[f'CMS_emu_Mass_{sys}_{UpDown}'] = e_m_Mass_sys[-1].dtype
-          uproot_tree_dict[f'CMS_emu_Mass_{sys}_{UpDown}'] = e_m_Mass_sys[-1]
-          uproot_tree_dict_dtype[f'mva_{sys}_{UpDown}'] = mva_sys[-1].dtype
-          uproot_tree_dict[f'mva_{sys}_{UpDown}'] = mva_sys[-1]
-      with uproot3.recreate(f"results/SenScan/{whichcat_deep}_{whichcat}_{masspt}_tree.root") as f:
-        f['tree'] = uproot3.newtree(uproot_tree_dict_dtype)
-        f['tree'].extend(uproot_tree_dict)
-  
+#          e_m_Mass_sys.append(df_gg_vbf_deep[f'e_m_Mass_{sys}_{UpDown}'].to_numpy())
+#          mva_sys.append(df_gg_vbf_deep[f'mva_{sys}_{UpDown}'].to_numpy())
+#          h.append(coffea.hist.Hist(f"{sys}_{UpDown}",
+#                         coffea.hist.Bin("e_m_Mass", "e_m_Mass", 70000, 100, 170),
+#                         coffea.hist.Bin("mva", "mva", 100, 0, 1),
+#                         ))
+#          fillContent = {'CMS_emu_Mass': e_m_Mass_sys[-1], 'mva': mva_sys[-1], 'weight': weight}
+#          h[-1].fill(**fillContent)
+#          fsig[f'{sys}_{UpDown}'] = h[-1].to_hist()
+
+          groups = df_gg_vbf_deep.groupby(pd.cut(df_gg_vbf_deep[f'mva_{sys}_{UpDown}'], quantiles))
+
+          for i, group in enumerate(groups):
+            fsig[f'tree_{sys}_{UpDown}_{i+1}'] = {'CMS_emu_Mass': group[1][f'e_m_Mass_{sys}_{UpDown}'].to_numpy(), 'weight': group[1]['weight'].to_numpy()}
+
+
       #Loop through quantiles and turn tree into RooDataSet
   
       dict_ = {}
@@ -138,4 +133,4 @@ for masspt in [120,125,130]:
       #output sys dataframe
       quan_df = pd.DataFrame.from_dict(dict_)
       quan_df.sort_values(by='quantiles', inplace=True)
-      quan_df.set_index('quantiles').to_csv(f'results/SenScan/{whichcat_deep}_{whichcat}_{masspt}.csv')    
+      quan_df.set_index('quantiles').to_csv(f'results/SenScan_v9/{whichcat_deep}_{whichcat}_{masspt}.csv')    

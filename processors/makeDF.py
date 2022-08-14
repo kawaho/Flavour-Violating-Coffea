@@ -1,8 +1,6 @@
 from coffea import processor, hist
 from coffea.util import save
 from coffea.lookup_tools import extractor
-#old btag
-#from coffea.btag_tools import BTagScaleFactor
 import awkward as ak
 import correctionlib, numpy, json, os, sys
 from kinematics import *
@@ -10,20 +8,26 @@ from Vetos import *
 from Corrections import *
 
 class MyDF(processor.ProcessorABC):
-    def __init__(self, lumiWeight, year, btag_sf, muon_sf, electron_sf, evaluator):
+    def __init__(self, lumiWeight, year, btag_sf, muon_sf, electron_sf, electron_sf_pri, evaluator):
         self._samples = []
         self._lumiWeight = lumiWeight
         self._year = year
         self._btag_sf = btag_sf
         self._e_sf = electron_sf
+        self._e_sf_pri = electron_sf_pri
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._accumulator = processor.dict_accumulator({})
-        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "e_m_Mass_reso", "met", "eEta", "mEta", "mpt", "ept", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met", "e_mvaTTH", "m_mvaTTH", "e_mvaFall17V2Iso", "e_mvaFall17V2noIso", "mtrigger", "etrigger"]
-        self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaR_j1_em"]
-        self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaR_j1_j2", "Zeppenfeld_DeltaEta", "Rpt", "pt_cen_Deltapt", "Ht_had"]
+        self.var_ = ["opp_charge", "is2016preVFP", "is2016postVFP", "is2017", "is2018", "sample", "label", "weight", "njets", "e_m_Mass", "e_m_Mass_reso", "met", "eEta", "mEta", "mpt", "ept", "empt", "emEta", "DeltaEta_e_m", "DeltaR_e_m", "DeltaPhi_e_met", "DeltaPhi_m_met", "DeltaPhi_em_met", "abseEta", "absmEta"]
+        self.var_1jet_ = ["j1pt", "j1Eta", "DeltaEta_j1_em", "DeltaR_j1_em", "absj1Eta"]
+        self.var_2jet_ = ["isVBFcat", "j2pt", "j2Eta", "j1_j2_mass", "DeltaEta_em_j1j2", "DeltaR_em_j1j2", "DeltaEta_j2_em", "DeltaR_j2_em", "DeltaEta_j1_j2", "DeltaR_j1_j2", "Zeppenfeld_DeltaEta", "Rpt", "pt_cen_Deltapt", "Ht_had", "absj2Eta"]
         for var in self.var_+self.var_1jet_+self.var_2jet_:
-            self._accumulator[var] = processor.column_accumulator(numpy.array([]))
+            if 'is' in var or var=='opp_charge':
+              self._accumulator[var] = processor.column_accumulator(numpy.bool_([]))
+            elif var=='njets' or var=='sample' or var=='label':
+              self._accumulator[var] = processor.column_accumulator(numpy.uint8([]))
+            else:
+              self._accumulator[var] = processor.column_accumulator(numpy.array([]))
 #            self._accumulator[var+'_0jets'] = processor.column_accumulator(numpy.array([]))
 #            self._accumulator[var+'_1jets'] = processor.column_accumulator(numpy.array([]))
 #            self._accumulator[var+'_2jets'] = processor.column_accumulator(numpy.array([]))
@@ -48,14 +52,14 @@ class MyDF(processor.ProcessorABC):
           else:
             mpoint = int(emevents.metadata["dataset"].split('_')[-1][1:4])
             emevents["label"] = numpy.repeat(mpoint, len(emevents)) 
-        elif emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
+        elif 'data' in emevents.metadata["dataset"]: 
           emevents["label"] = numpy.repeat(3, len(emevents))
         else:
           emevents["label"] = numpy.zeros(len(emevents))
-        emevents["is2016preVFP"] = numpy.ones(len(emevents)) if self._year == '2016preVFP' else numpy.zeros(len(emevents))
-        emevents["is2016postVFP"] = numpy.ones(len(emevents)) if self._year == '2016postVFP' else numpy.zeros(len(emevents))
-        emevents["is2017"] = numpy.ones(len(emevents)) if self._year == '2017' else numpy.zeros(len(emevents))
-        emevents["is2018"] = numpy.ones(len(emevents)) if self._year == '2018' else numpy.zeros(len(emevents))
+        emevents["is2016preVFP"] = numpy.ones(len(emevents), dtype=bool) if self._year == '2016preVFP' else numpy.zeros(len(emevents))
+        emevents["is2016postVFP"] = numpy.ones(len(emevents), dtype=bool) if self._year == '2016postVFP' else numpy.zeros(len(emevents))
+        emevents["is2017"] = numpy.ones(len(emevents), dtype=bool) if self._year == '2017' else numpy.zeros(len(emevents))
+        emevents["is2018"] = numpy.ones(len(emevents), dtype=bool) if self._year == '2018' else numpy.zeros(len(emevents))
         emevents["sample"] = numpy.repeat(self._samples.index(emevents.metadata["dataset"]), len(emevents))
 
         tmpElectron_collections = ak.zip(
@@ -84,10 +88,10 @@ class MyDF(processor.ProcessorABC):
 
         emevents["e_m_Mass_reso"] = numpy.sqrt( e_m_Mass_mreso**2+e_m_Mass_ereso**2 )
 
-        emevents["m_mvaTTH"] = Muon_collections.mvaTTH
-        emevents["e_mvaTTH"] = Electron_collections.mvaTTH
-        emevents["e_mvaFall17V2noIso"] = Electron_collections.mvaFall17V2noIso
-        emevents["e_mvaFall17V2Iso"] = Electron_collections.mvaFall17V2Iso
+#        emevents["m_mvaTTH"] = Muon_collections.mvaTTH
+#        emevents["e_mvaTTH"] = Electron_collections.mvaTTH
+#        emevents["e_mvaFall17V2noIso"] = Electron_collections.mvaFall17V2noIso
+#        emevents["e_mvaFall17V2Iso"] = Electron_collections.mvaFall17V2Iso
 
         emVar = Electron_collections + Muon_collections
         emevents["emEta"] = emVar.eta
@@ -151,11 +155,14 @@ class MyDF(processor.ProcessorABC):
     # we will receive a NanoEvents instead of a coffea DataFrame
     def process(self, events):
         out = self.accumulator.identity()
-        emevents = Vetos(self._year, events, sameCharge=True)
+        sameCharge = not ('LFV' in events.metadata["dataset"])
+        emevents = Vetos(self._year, events, sameCharge=sameCharge)
         if len(emevents)>0:
-          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents, (110,160))
-          SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._evaluator)
-          emevents = SF_fun.evaluate(emevents, doQCD=True)
+          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents, (90,180))
+          SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._e_sf_pri, self._evaluator)
+          emevents = SF_fun.evaluate(emevents, doQCD=sameCharge)
+          emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = emevents[emevents.weight!=0], Electron_collections[emevents.weight!=0], Muon_collections[emevents.weight!=0], MET_collections[emevents.weight!=0], Jet_collections[emevents.weight!=0]
+
           emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
 
@@ -194,29 +201,22 @@ if __name__ == '__main__':
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2016HighPt.json"]
       if 'pre' in year:
         TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016preVFP_UL_trackerMuon.json"]
-        #old btag
-        #btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL16SF.csv", "LOOSE")
       else:
         TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2016postVFP_UL_trackerMuon.json"]
-        #old btag
-        #btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL16SF.csv", "LOOSE")
          
     elif '2017' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_ss_corr Corrections/QCD/em_qcd_osss_2017.root", "hist_em_qcd_osss_os_corr hist_em_qcd_osss_os_corr Corrections/QCD/em_qcd_osss_2017.root"]
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2017_UL_trackerMuon.json"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2017HighPt.json"]
-      #old btag
-      #btag_sf = BTagScaleFactor("Corrections/bTag/DeepCSV_106XUL17SF_WPonly_V2p1.csv", "LOOSE")
     elif '2018' in year:
       QCDhist=["hist_em_qcd_osss_ss_corr hist_em_qcd_osss_closureOS Corrections/QCD/em_qcd_osss_2018.root", "hist_em_qcd_osss_os_corr hist_em_qcd_extrap_uncert Corrections/QCD/em_qcd_osss_2018.root"]
       TrackerMu=["trackerMu NUM_TrackerMuons_DEN_genTracks/abseta_pt_value Corrections/TrackerMu/Efficiency_muon_generalTracks_Run2018_UL_trackerMuon.json"]
       TrackerMu_Hi=["trackerMu_Hi NUM_TrackerMuons_DEN_genTracks/abseta_p_value Corrections/TrackerMu/2018HighPt.json"]
-      #old btag
-      #btag_sf = BTagScaleFactor("Corrections/bTag/DeepJet_106XUL18SF_WPonly_V1p1.csv", "LOOSE")
 
     btag_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/BTV/{year}_UL/btagging.json.gz")
     muon_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/MUO/{year}_UL/muon_Z.json.gz")
     electron_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/EGM/{year}_UL/electron.json.gz")
+    electron_sf_pri = correctionlib.CorrectionSet.from_file(f"ScaleFactorsJSON/{year}_UL/electron_hem.json")
     ext = extractor()
     ext.add_weight_sets(QCDhist)
     ext.add_weight_sets(TrackerMu)
@@ -224,6 +224,6 @@ if __name__ == '__main__':
     ext.finalize()
     evaluator = ext.make_evaluator()
 
-    processor_instance = MyDF(lumiWeight, year, btag_sf, muon_sf, electron_sf, evaluator)#, *find_samples.samples_to_run['makeDF'])
+    processor_instance = MyDF(lumiWeight, year, btag_sf, muon_sf, electron_sf, electron_sf_pri, evaluator)#, *find_samples.samples_to_run['makeDF'])
     outname = os.path.basename(__file__).replace('.py','')
     save(processor_instance, f'processors/{outname}_{year}.coffea')

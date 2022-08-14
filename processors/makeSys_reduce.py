@@ -12,52 +12,56 @@ from Corrections import *
 from BDT_functions import *
 
 class MyEMuPeak(processor.ProcessorABC):
-    def __init__(self, lumiWeight, BDTmodels, BDTvars, year, btag_sf, muon_sf, electron_sf, evaluator, VBF_quan, GG_quan):
+    def __init__(self, lumiWeight, BDTmodels, BDTvars, year, btag_sf, muon_sf, electron_sf, electron_sf_pri, electron_ss, evaluator):#, 100,0,1, 100,0,1):
         self._lumiWeight = lumiWeight
         self._BDTmodels = BDTmodels
         self._btag_sf = btag_sf
         self._e_sf = electron_sf
+        self._e_sf_pri = electron_sf_pri
+        self._e_ss = electron_ss
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._year = year
         self._jecYear = self._year[:4]
-        self.var_GG_ = BDTvars['model_GG']
-        self.var_2jet_VBF_ = BDTvars['model_VBF']
+        self.var_GG_ = BDTvars['model_gg_v9']
+        self.var_2jet_VBF_ = BDTvars['model_vbf_v9']
         self.jetUnc = ['jesAbsolute', 'jesBBEC1', 'jesFlavorQCD', 'jesEC2', 'jesHF', 'jesRelativeBal']
         self.metUnc = ['UnclusteredEn']
         self.jetyearUnc = sum([[f'jer_{year}', f'jesAbsolute_{year}', f'jesBBEC1_{year}', f'jesEC2_{year}', f'jesHF_{year}', f'jesRelativeSample_{year}'] for year in ['2017', '2018', '2016']], [])
         self.sfUnc = sum([[f'pu_{year}', f'bTag_{year}'] for year in ['2017', '2018', '2016']], [])
-        self.sfUnc += ['pf_2016', 'pf_2017', 'mID', 'mIso', 'mTrg', 'eReco', 'eID']
+        self.sfUnc += ['pf_2016', 'pf_2017', 'mID', 'mIso', 'mTrg', 'eReco', 'eID', 'eIso', 'eTrig']
         self.theoUnc = [f'lhe{i}' for i in range(103)] + ['scalep5p5', 'scale22']
-        self.leptonUnc = ['ees', 'eer', 'me']
+        self.leptonUnc = ['ess', 'me'] #'eer'
         self._accumulator = processor.dict_accumulator({})
         self._accumulator[f'e_m_Mass'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'ept'] = processor.column_accumulator(numpy.array([]))
+        self._accumulator[f'mpt'] = processor.column_accumulator(numpy.array([]))
         self._accumulator[f'isVBFcat'] = processor.column_accumulator(numpy.bool_([]))
         self._accumulator[f'isVBF'] = processor.column_accumulator(numpy.bool_([]))
         self._accumulator[f'isHerwig'] = processor.column_accumulator(numpy.bool_([]))
-        self._accumulator[f'njets'] = processor.column_accumulator(numpy.ubyte([]))
+        self._accumulator[f'njets'] = processor.column_accumulator(numpy.uint8([]))
         self._accumulator[f'mva'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'year'] = processor.column_accumulator(numpy.ubyte([]))
+        self._accumulator[f'year'] = processor.column_accumulator(numpy.uint8([]))
         self._accumulator[f'weight'] = processor.column_accumulator(numpy.array([]))
-        self._accumulator[f'mva_hist-herwig_GGcat'] = hist.Hist("Events", hist.Bin("mva", "mva", GG_quan))
-        self._accumulator[f'mva_hist-herwig_VBFcat'] = hist.Hist("Events", hist.Bin("mva", "mva", VBF_quan))
+        self._accumulator[f'mva_hist-herwig_GGcat'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
+        self._accumulator[f'mva_hist-herwig_VBFcat'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
         for cat in ['GG_GGcat', 'GG_VBFcat', 'VBF_GGcat', 'VBF_VBFcat']:
           if 'VBFcat' in cat:
-            self._accumulator[f'mva_hist-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", VBF_quan))
+            self._accumulator[f'mva_hist-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
           else:
-            self._accumulator[f'mva_hist-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", GG_quan))
+            self._accumulator[f'mva_hist-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
           for sys in self.jetUnc+self.jetyearUnc+self.metUnc+self.sfUnc+self.leptonUnc:
               if 'VBFcat' in cat:
-                self._accumulator[f'mva_hist_{sys}_Up-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", VBF_quan))
-                self._accumulator[f'mva_hist_{sys}_Down-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", VBF_quan))
+                self._accumulator[f'mva_hist_{sys}_Up-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
+                self._accumulator[f'mva_hist_{sys}_Down-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
               else:
-                self._accumulator[f'mva_hist_{sys}_Up-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", GG_quan))
-                self._accumulator[f'mva_hist_{sys}_Down-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", GG_quan))
+                self._accumulator[f'mva_hist_{sys}_Up-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
+                self._accumulator[f'mva_hist_{sys}_Down-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
           for sys in self.theoUnc:
               if 'VBFcat' in cat:
-                self._accumulator[f'mva_hist_{sys}-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", VBF_quan))
+                self._accumulator[f'mva_hist_{sys}-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
               else:
-                self._accumulator[f'mva_hist_{sys}-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", GG_quan))
+                self._accumulator[f'mva_hist_{sys}-{cat}'] = hist.Hist("Events", hist.Bin("mva", "mva", 100,0,1))
         for sys in self.leptonUnc:
             self._accumulator[f'mva_{sys}_Up'] = processor.column_accumulator(numpy.array([]))
             self._accumulator[f'mva_{sys}_Down'] = processor.column_accumulator(numpy.array([]))
@@ -72,11 +76,11 @@ class MyEMuPeak(processor.ProcessorABC):
         #make interesting variables
         #zero/any no. of jets
         if '2016' in self._year:
-          emevents["year"] = numpy.full(len(emevents), 0, dtype=numpy.ubyte)
+          emevents["year"] = numpy.full(len(emevents), 0, dtype=numpy.uint8)
         elif '2017' in self._year:
-          emevents["year"] = numpy.full(len(emevents), 1, dtype=numpy.ubyte)
+          emevents["year"] = numpy.full(len(emevents), 1, dtype=numpy.uint8)
         else:
-          emevents["year"] = numpy.full(len(emevents), 2, dtype=numpy.ubyte)
+          emevents["year"] = numpy.full(len(emevents), 2, dtype=numpy.uint8)
         if ('VBF' in emevents.metadata["dataset"]) and (not 'H' in emevents.metadata["dataset"][-1]):
           emevents["isVBF"] = numpy.full(len(emevents), True, dtype=numpy.bool_) 
         else:
@@ -93,10 +97,11 @@ class MyEMuPeak(processor.ProcessorABC):
         emevents = Vetos(self._year, events)
         if len(emevents)>0:
           emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections = Corrections(emevents)
-          SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._evaluator)
+          SF_fun = SF(self._lumiWeight, self._year, self._btag_sf, self._m_sf, self._e_sf, self._e_sf_pri, self._evaluator)
           emevents = SF_fun.evaluate(emevents, doQCD=False, doSys=True)
           emevents = self.interesting(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections)
-          emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections, doSys=True)
+          emevents = interestingKin(emevents, Electron_collections, Muon_collections, MET_collections, Jet_collections, doSys=True, e_ss=self._e_ss, year_=self._year, jetUnc_=self.jetUnc,jetyearUnc=self.jetyearUnc,_jecYear=self._jecYear)
+
           BDT_fun = BDT_functions(self._BDTmodels, self.var_GG_, self.var_2jet_VBF_)
           emevents = BDT_fun.pandasDF(emevents)
           for sys in self.leptonUnc+self.metUnc:
@@ -222,12 +227,15 @@ class MyEMuPeak(processor.ProcessorABC):
         return accumulator
 
 if __name__ == '__main__':
-  BDTjsons = ['model_GG', 'model_VBF']
+  BDTjsons = ['model_gg_v9', 'model_vbf_v9']
   BDTmodels = {}
   BDTvars = {}
   for BDTjson in BDTjsons:
     BDTmodels[BDTjson] = xgb.XGBClassifier()
-    BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/{BDTjson}.json')
+    if 'gg' in BDTjson:
+      BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/model_gg_v9_og.json')
+    else:
+      BDTmodels[BDTjson].load_model(f'XGBoost-for-HtoEMu/results/{BDTjson}.json')
     BDTvars[BDTjson] = BDTmodels[BDTjson].get_booster().feature_names
 
     print(BDTmodels[BDTjson].get_booster().feature_names)
@@ -253,14 +261,15 @@ if __name__ == '__main__':
     btag_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/BTV/{year}_UL/btagging.json.gz")
     muon_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/MUO/{year}_UL/muon_Z.json.gz")
     electron_sf = correctionlib.CorrectionSet.from_file(f"jsonpog-integration/POG/EGM/{year}_UL/electron.json.gz")
+    electron_sf_pri = correctionlib.CorrectionSet.from_file(f"ScaleFactorsJSON/{year}_UL/electron_hem.json")
+    electron_ss = correctionlib.CorrectionSet.from_file(f"ScaleFactorsJSON-dev/{year}_UL/photonSS.json")
     ext = extractor()
     ext.add_weight_sets(TrackerMu)
     ext.add_weight_sets(TrackerMu_Hi)
     ext.finalize()
     evaluator = ext.make_evaluator()
-    VBF_quan = numpy.load(f"results/SenScan/VBFcat_quantiles",allow_pickle=True)
-    GG_quan = numpy.load(f"results/SenScan/GGcat_quantiles",allow_pickle=True)
-    processor_instance = MyEMuPeak(lumiWeight, BDTmodels, BDTvars, year, btag_sf, muon_sf, electron_sf, evaluator, VBF_quan, GG_quan)
+#    100,0,1 = numpy.load(f"results/SenScan/VBFcat_quantiles",allow_pickle=True)
+#    100,0,1 = numpy.load(f"results/SenScan/GGcat_quantiles",allow_pickle=True)
+    processor_instance = MyEMuPeak(lumiWeight, BDTmodels, BDTvars, year, btag_sf, muon_sf, electron_sf, electron_sf_pri, electron_ss, evaluator)#, 100,0,1, 100,0,1)
     outname = os.path.basename(__file__).replace('.py','')
-    for masspt in [120,125,130]:
-      save(processor_instance, f'processors/{outname}_{masspt}_{year}.coffea')
+    save(processor_instance, f'processors/{outname}_{year}.coffea')

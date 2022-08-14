@@ -76,9 +76,10 @@ if __name__ == '__main__':
     os.system("condor_submit_workers --cores 8 --memory 8000 --disk 8000 -M "+master_name+f" {args.workers}")
   else:
     executor = processor.futures_executor  
-    ncpu = int(os.cpu_count()/2)
+    ncpu = int(os.cpu_count())
     print ("Number of cores: %i"%ncpu)
-    executor_args['workers'] = ncpu
+    print ("Using %i"%args.workers)
+    executor_args['workers'] = args.workers
 
   with open(f'lumi_{args.year}.json') as f:
       lumiWeight = json.load(f)

@@ -4,7 +4,7 @@ import find_samples
 parser = argparse.ArgumentParser(description='Run coffea processors with screen')
 parser.add_argument('-s', '--subfix', type=str, default=None, help='output tag')
 parser.add_argument('-o', '--onejob', action='store_true', help='specify one job to run')
-parser.add_argument('-y', '--year', type=str, default='2018,2017,2016postVFP,2016preVFP', help='analysis year separated by comma')
+parser.add_argument('-y', '--year', type=str, default='2018,2017,2016preVFP,2016postVFP', help='analysis year separated by comma')
 parser.add_argument('-b', '--baseprocessor', type=str, default=None, help='processor tag separated by comma')
 parser.add_argument('-j', '--workers', type=int, default=25, help='Number of workers to use for multi-worker executors (e.g. futures or condor) (default: %(default)s)')
 parser.add_argument('-g', '--group', type=str, default=None, help='Run a group only, comma separated')

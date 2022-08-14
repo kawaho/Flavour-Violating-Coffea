@@ -1,11 +1,12 @@
 import awkward as ak
 import numpy
 class SF:
-    def __init__(self, lumiWeight, year, btag_sf, muon_sf, electron_sf, evaluator):
+    def __init__(self, lumiWeight, year, btag_sf, muon_sf, electron_sf, electron_sf_pri, evaluator):
         self._lumiWeight = lumiWeight
         self._year = year
         self._btag_sf = btag_sf
         self._e_sf = electron_sf
+        self._e_sf_pri = electron_sf_pri
         self._m_sf = muon_sf
         self._evaluator = evaluator
         self._jecYear = self._year[:4]
@@ -14,12 +15,10 @@ class SF:
         Muon_collections = emevents.Muon[emevents.Muon.Target==1][:,0]
         Electron_collections = emevents.Electron[emevents.Electron.Target==1][:,0]
           
-        if emevents.metadata["dataset"]=='SingleMuon' or emevents.metadata["dataset"] == 'data': 
-          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==0 #numpy.ones(len(emevents))
+        if 'data' in emevents.metadata["dataset"]: 
+          SF = ak.sum(emevents.Jet.passDeepJet_L,1)==0
         else:
           #Get bTag SF
-          #old btag
-          #btagSF_deepjet_L = self._btag_sf.eval("central", emevents.Jet.hadronFlavour, abs(emevents.Jet.eta), emevents.Jet.pt_nom)
           jet_flat = ak.flatten(emevents.Jet)
           btagSF_deepjet_L = numpy.zeros(len(jet_flat))
           jet_light = ak.where((jet_flat.passDeepJet_L) & (jet_flat.hadronFlavour==0))
@@ -40,7 +39,7 @@ class SF:
             #SF = SF*emevents.PrefireWeight
           #Zvtx
           #if self._year == '2017':
-          #  SF = 0.991*SF
+          #  SF = ak.where(emevents['etrigger'], 0.991, 1)*SF
     
           #Muon SF
           Muon_low = ak.mask(Muon_collections, Muon_collections['pt'] <= 120)
@@ -54,29 +53,41 @@ class SF:
             triggerstr = 'NUM_IsoMu27_DEN_CutBasedIdTight_and_PFIsoTight'
           elif self._year == '2018':
             triggerstr = 'NUM_IsoMu24_DEN_CutBasedIdTight_and_PFIsoTight'
-          Muon_pass = ak.mask(Muon_collections, emevents['mtrigger'])
           
-          MuTrigger_SF = ak.where(emevents['mtrigger'], self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(ak.fill_none(Muon_pass.eta,2)).to_numpy(), ak.fill_none(Muon_pass.pt,30).to_numpy(), "sf"), numpy.ones(len(SF))) 
+          MuTrigger_SF = numpy.ones(len(emevents))
+          Mu_pass = ak.where(emevents['mtrigger'])
+          MuTrigger_SF[Mu_pass] = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections[Mu_pass].eta).to_numpy(), Muon_collections[Mu_pass].pt.to_numpy(), "sf")
           MuID_SF = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
           MuISO_SF = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "sf") 
     
           SF = SF*MuTrigger_SF*MuID_SF*MuISO_SF*Trk_SF*Trk_SF_Hi
-          #SF = SF*Muon_collections.Trigger_SF*Muon_collections.ID_SF*Muon_collections.ISO_SF*Trk_SF*Trk_SF_Hi
     
           #Electron SF and lumi
           EleReco_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","RecoAbove20", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+          #EleIDISO_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","wp80iso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
           EleIDnoISO_SF = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sf","wp80noiso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
-          SF = SF*EleReco_SF*EleIDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
-          #SF = SF*Electron_collections.Reco_SF*Electron_collections.IDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
+          EleISO_SF = self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sf","Iso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+          Ele_pass = ak.where(emevents['etrigger'])
+          EleTrig_SF = numpy.ones(len(emevents))
+     
+          EleTrig_SF[Ele_pass] = self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sf","Trig", Electron_collections[Ele_pass].eta.to_numpy(), Electron_collections[Ele_pass].pt.to_numpy()) 
+
+          #Zvtx
+          if self._year == '2017':
+            EleTrig_SF[Ele_pass]*=0.991
+
+          SF = SF*EleISO_SF*EleTrig_SF*EleReco_SF*EleIDnoISO_SF*self._lumiWeight[emevents.metadata["dataset"]]
     
           SF = SF.to_numpy()
           SF[abs(SF)>10] = 0
     
           if doSys:
-            MuTrigger_SF_Up = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systup") 
+            MuTrigger_SF_Up = numpy.ones(len(emevents))
+            MuTrigger_SF_Up[Mu_pass] = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections[Mu_pass].eta).to_numpy(), Muon_collections[Mu_pass].pt.to_numpy(), "systup")
             MuID_SF_Up = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systup") 
             MuISO_SF_Up = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systup") 
-            MuTrigger_SF_Down = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systdown") 
+            MuTrigger_SF_Down = numpy.ones(len(emevents))
+            MuTrigger_SF_Down[Mu_pass] = self._m_sf[triggerstr].evaluate(f"{self._year}_UL", abs(Muon_collections[Mu_pass].eta).to_numpy(), Muon_collections[Mu_pass].pt.to_numpy(), "systdown")
             MuID_SF_Down = self._m_sf["NUM_TightID_DEN_TrackerMuons"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systdown") 
             MuISO_SF_Down = self._m_sf["NUM_TightRelIso_DEN_TightIDandIPCut"].evaluate(f"{self._year}_UL", abs(Muon_collections.eta).to_numpy(), Muon_collections.pt.to_numpy(), "systdown") 
             emevents[f"weight_mID_Up"] = SF*MuID_SF_Up/MuID_SF
@@ -87,12 +98,25 @@ class SF:
             emevents[f"weight_mTrg_Down"] = SF*MuTrigger_SF_Down/MuTrigger_SF
             EleReco_SF_Up = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sfup","RecoAbove20", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
             EleIDnoISO_SF_Up = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sfup","wp80noiso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+            EleISO_SF_Up = self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sfup","Iso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+            EleTrig_SF_Up = numpy.ones(len(emevents))
+            EleTrig_SF_Up[Ele_pass] = self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sfup","Trig", Electron_collections[Ele_pass].eta.to_numpy(), Electron_collections[Ele_pass].pt.to_numpy()) 
             EleReco_SF_Down = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sfdown","RecoAbove20", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
             EleIDnoISO_SF_Down = self._e_sf["UL-Electron-ID-SF"].evaluate(self._year,"sfdown","wp80noiso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+            EleISO_SF_Down = self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sfdown","Iso", Electron_collections.eta.to_numpy(), Electron_collections.pt.to_numpy())
+            EleTrig_SF_Down = numpy.ones(len(emevents))
+            EleTrig_SF_Down[Ele_pass] = self._e_sf_pri["UL-Electron-ID-SF"].evaluate(self._year,"sfdown","Trig", Electron_collections[Ele_pass].eta.to_numpy(), Electron_collections[Ele_pass].pt.to_numpy()) 
+            if self._year == '2017':
+              EleTrig_SF_Up[Ele_pass]*=0.991
+              EleTrig_SF_Down[Ele_pass]*=0.991
             emevents[f"weight_eReco_Up"] = SF*EleReco_SF_Up/EleReco_SF
             emevents[f"weight_eID_Up"] = SF*EleIDnoISO_SF_Up/EleIDnoISO_SF
+            emevents[f"weight_eIso_Up"] = SF*EleISO_SF_Up/EleISO_SF
+            emevents[f"weight_eTrig_Up"] = SF*EleTrig_SF_Up/EleTrig_SF
             emevents[f"weight_eReco_Down"] = SF*EleReco_SF_Down/EleReco_SF
             emevents[f"weight_eID_Down"] = SF*EleIDnoISO_SF_Down/EleIDnoISO_SF
+            emevents[f"weight_eIso_Down"] = SF*EleISO_SF_Down/EleISO_SF
+            emevents[f"weight_eTrig_Down"] = SF*EleTrig_SF_Down/EleTrig_SF
     
             for other_year in ['2016', '2017', '2018']:
               emevents[f"weight_bTag_{other_year}_Up"] = SF
@@ -172,7 +196,7 @@ class SF:
     
         return emevents
 
-def Corrections(emevents, massrange=(100,170)):
+def Corrections(emevents, massrange=(90,180)):
     Electron_collections = emevents.Electron[emevents.Electron.Target==1]
     Muon_collections = emevents.Muon[emevents.Muon.Target==1]
     MET_collections = emevents.MET

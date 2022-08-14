@@ -8,13 +8,16 @@ class BDT_functions:
     
     def BDTscore(self, XFrame, isVBF=False):
         if isVBF:
-           model_load = self._BDTmodels["model_VBF"]
+           model_load = self._BDTmodels["model_vbf_v9"]
         else:
-           model_load = self._BDTmodels[f"model_GG"]
+           model_load = self._BDTmodels[f"model_gg_v9"]
         return model_load.predict_proba(XFrame)
 
     def pandasDF(self, emevents, unc=None, UpDown=None, isJetSys=False):
         if unc==None:
+#          for i in self.var_GG_:
+#            print(i, emevents[i].type)
+#            for k in emevents[i]: print(k)
           Xframe_GG = ak.to_pandas(emevents[self.var_GG_]).fillna(value=numpy.nan)
           Xframe_2jet_VBF = ak.to_pandas(emevents[self.var_2jet_VBF_])
  

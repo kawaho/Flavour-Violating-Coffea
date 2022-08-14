@@ -1,34 +1,32 @@
-samples_to_run = {
+samples_to_run = dict({
 'signal': ['GluGlu_LFV_HToEMu_M125', 'VBF_LFV_HToEMu_M125'],
 'signalAlt': ['GluGlu_LFV_HToEMu_M110', 'VBF_LFV_HToEMu_M110', 'GluGlu_LFV_HToEMu_M120', 'VBF_LFV_HToEMu_M120', 'GluGlu_LFV_HToEMu_M130', 'VBF_LFV_HToEMu_M130', 'GluGlu_LFV_HToEMu_M140', 'VBF_LFV_HToEMu_M140', 'GluGlu_LFV_HToEMu_M150', 'VBF_LFV_HToEMu_M150', 'GluGlu_LFV_HToEMu_M160', 'VBF_LFV_HToEMu_M160'],
-'data': ['data'],
+'data': ['dataE','data'],
 'diboson': ['ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5'],
 'tt': ['TTTo2L2Nu', 'TTToSemiLeptonic', 'TTToHadronic'],
+'others':['ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_InclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'WJetsToLNu_TuneCP5', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'WGToLNuG_TuneCP5'],
 'st': ['ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_InclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays'],
 'dy': ['DYJetsToLL_M-50', 'DYJetsToLL_M-10to50'],
 'wjets': ['WJetsToLNu_TuneCP5'],
 'higgs': ['GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau'],
 'ewk': ['EWKWMinus2Jets', 'EWKWPlus2Jets', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'WGToLNuG_TuneCP5'],
 
-'makeData': ['data'],
+'makeData': ['data', 'dataE'],
 'makeSys': ['GluGlu_LFV_HToEMu_M125', 'VBF_LFV_HToEMu_M125'],
 'makeSimple': ['GluGlu_LFV_HToEMu_M125', 'GluGlu_LFV_HToEMu_M120', 'GluGlu_LFV_HToEMu_M130', 'VBF_LFV_HToEMu_M120', 'VBF_LFV_HToEMu_M125', 'VBF_LFV_HToEMu_M130'],
-'makeSys_reduce_120': ['VBF_LFV_HToEMu_M120H', 'GluGlu_LFV_HToEMu_M120', 'VBF_LFV_HToEMu_M120'],
-'makeSys_reduce_125': ['VBF_LFV_HToEMu_M125H', 'GluGlu_LFV_HToEMu_M125', 'VBF_LFV_HToEMu_M125'],
-'makeSys_reduce_130': ['VBF_LFV_HToEMu_M130H', 'GluGlu_LFV_HToEMu_M130', 'VBF_LFV_HToEMu_M130'],
 'makeHist': ['GluGlu_LFV_HToEMu_M125'], #'VBF_LFV_HToEMu_M125', 'data', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'TTTo2L2Nu', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'DYJetsToLL_0J', 'DYJetsToLL_1J', 'DYJetsToLL_2J', 'WGToLNuG_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_inclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'WJetsToLNu_TuneCP5', 'W1JetsToLNu', 'W2JetsToLNu', 'W3JetsToLNu', 'W4JetsToLNu'], #, 'WJetsToLNu_TuneCP5', '"WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J'
 
 'makeHist_bTag': ['GluGlu_LFV_HToEMu_M125'], #'VBF_LFV_HToEMu_M125', 'data', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'TTTo2L2Nu', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'DYJetsToLL_0J', 'DYJetsToLL_1J', 'DYJetsToLL_2J', 'WGToLNuG_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_inclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'WJetsToLNu_TuneCP5', 'W1JetsToLNu', 'W2JetsToLNu', 'W3JetsToLNu', 'W4JetsToLNu'], #, 'WJetsToLNu_TuneCP5', '"WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J'
 
 'makeBDTValid': ['TTTo2L2Nu'], #'GluGlu_LFV_HToEMu_M125', 'VBF_LFV_HToEMu_M125', 'data', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'TTTo2L2Nu', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'DYJetsToLL_0J', 'DYJetsToLL_1J', 'DYJetsToLL_2J', 'WGToLNuG_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_inclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'WJetsToLNu_TuneCP5', 'W1JetsToLNu', 'W2JetsToLNu', 'W3JetsToLNu', 'W4JetsToLNu'], #, 'WJetsToLNu_TuneCP5', '"WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J'
 
-'makeDF':['data', 'GluGlu_LFV_HToEMu_M125', 'VBF_LFV_HToEMu_M125', 'TTTo2L2Nu', 'GluGlu_LFV_HToEMu_M120', 'VBF_LFV_HToEMu_M120', 'GluGlu_LFV_HToEMu_M130', 'VBF_LFV_HToEMu_M130', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'WGToLNuG_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_InclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'WJetsToLNu_TuneCP5', 'GluGlu_LFV_HToEMu_M110', 'VBF_LFV_HToEMu_M110', 'GluGlu_LFV_HToEMu_M140', 'VBF_LFV_HToEMu_M140', 'GluGlu_LFV_HToEMu_M150', 'VBF_LFV_HToEMu_M150', 'GluGlu_LFV_HToEMu_M160', 'VBF_LFV_HToEMu_M160'], #, 'WJetsToLNu_TuneCP5', '"WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J'
+'makeDF':['dataE', 'GluGlu_LFV_HToEMu_M125', 'VBF_LFV_HToEMu_M125', 'TTTo2L2Nu', 'GluGlu_LFV_HToEMu_M120', 'VBF_LFV_HToEMu_M120', 'GluGlu_LFV_HToEMu_M130', 'VBF_LFV_HToEMu_M130', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'WGToLNuG_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_InclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'WJetsToLNu_TuneCP5', 'GluGlu_LFV_HToEMu_M110', 'VBF_LFV_HToEMu_M110', 'GluGlu_LFV_HToEMu_M140', 'VBF_LFV_HToEMu_M140', 'GluGlu_LFV_HToEMu_M150', 'VBF_LFV_HToEMu_M150', 'GluGlu_LFV_HToEMu_M160', 'VBF_LFV_HToEMu_M160', 'data'], #, 'WJetsToLNu_TuneCP5', '"WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J'
 
 'makeSimple_DF':['data', 'GluGlu_LFV_HToEMu_M125', 'VBF_LFV_HToEMu_M125', 'TTTo2L2Nu', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'WGToLNuG_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_InclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'WJetsToLNu_TuneCP5'], #, 'WJetsToLNu_TuneCP5', '"WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J'
 
 'makeDF_WW':['data', 'TTTo2L2Nu', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'WGToLNuG_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_InclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'WJetsToLNu_TuneCP5', 'W1JetsToLNu', 'W2JetsToLNu', 'W3JetsToLNu', 'W4JetsToLNu'], #, 'WJetsToLNu_TuneCP5', '"WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J'
 
-'makeDF_tt':['data', 'TTTo2L2Nu', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'DYJetsToLL_M-50', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_InclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'WJetsToLNu_TuneCP5'],
+'makeDF_tt':['data', 'dataE', 'TTTo2L2Nu', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'DYJetsToLL_M-50', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_InclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'WJetsToLNu_TuneCP5'],
 
 'makeDF_CR':['data', 'TTTo2L2Nu', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'DYJetsToLL_M-50', 'DYJetsToLL_M-10to50', 'WGToLNuG_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'ST_tW_antitop_5f_inclusiveDecays', 'ST_tW_top_5f_inclusiveDecays', 'ST_t-channel_antitop_4f_inclusiveDecays', 'ST_t-channel_top_4f_InclusiveDecays', 'EWKZ2Jets_ZToLL', 'EWKZ2Jets_ZToNuNu', 'EWKWMinus2Jets', 'EWKWPlus2Jets', 'GluGluHToTauTau', 'VBFHToTauTau', 'WminusHToTauTau', 'WplusHToTauTau', 'GluGluHToWWTo2L2Nu', 'VBFHToWWTo2L2Nu', 'ZHToTauTau', 'WJetsToLNu_TuneCP5', 'W1JetsToLNu', 'W2JetsToLNu', 'W3JetsToLNu', 'W4JetsToLNu'], #, 'WJetsToLNu_TuneCP5', '"WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J'
 
@@ -38,4 +36,6 @@ samples_to_run = {
 
 'DYcorrected': ['data', 'DYJetsToLL_M-50', 'DYJetsToLL_0J', 'DYJetsToLL_1J', 'DYJetsToLL_2J', 'WJetsToLNu_TuneCP5', 'WJetsToLNu_0J', 'WJetsToLNu_1J', 'WJetsToLNu_2J', 'ZZ_TuneCP5', 'WZ_TuneCP5', 'WW_TuneCP5', 'TTToSemiLeptonic', 'TTToHadronic', 'TTTo2L2Nu']
 
-}
+}, **{f'signal_{i}': [f'VBF_LFV_HToEMu_M{i}H', f'GluGlu_LFV_HToEMu_M{i}', f'VBF_LFV_HToEMu_M{i}'] for i in [110,120,125,130,140,150,160]})
+if __name__ == '__main__':
+  print(samples_to_run)
